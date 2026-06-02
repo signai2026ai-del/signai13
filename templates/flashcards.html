@@ -1,0 +1,296 @@
+{% extends "base_app.html" %}
+{% block title %}Flashcards — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.fc-hero{text-align:center;margin-bottom:2rem}
+.fc-progress-wrap{max-width:480px;margin:0 auto 1.5rem}
+.fc-progress-bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:.5rem}
+.fc-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent-primary),var(--accent-secondary));transition:width .4s cubic-bezier(.4,0,.2,1)}
+.fc-counter{font-size:.8rem;color:var(--text-secondary);display:flex;justify-content:space-between}
+.fc-scene{perspective:1000px;width:100%;max-width:480px;margin:0 auto;cursor:pointer;user-select:none}
+.fc-card{position:relative;width:100%;height:320px;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,0,.2,1);border-radius:1.5rem}
+.fc-card.flipped{transform:rotateY(180deg)}
+.fc-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+.fc-front{background:var(--bg-card);border:1.5px solid var(--border)}
+.fc-back{transform:rotateY(180deg);background:linear-gradient(135deg,rgba(108,99,255,.1),rgba(0,212,170,.06));border:1.5px solid rgba(108,99,255,.35)}
+.fc-big-letter{font-size:8rem;font-weight:900;line-height:1;margin-bottom:.5rem}
+.fc-flip-hint{font-size:.8rem;color:var(--text-secondary);display:flex;align-items:center;gap:.35rem;position:absolute;bottom:1rem}
+.fc-controls{display:flex;gap:.75rem;justify-content:center;align-items:center;margin-top:1.5rem;flex-wrap:wrap}
+.fc-btn{padding:.6rem 1.5rem;border-radius:.875rem;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
+.fc-btn:hover{border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(108,99,255,.08)}
+.fc-btn.known{border-color:#10b981;color:#10b981;background:rgba(16,185,129,.08)}
+.fc-btn.known:hover{background:rgba(16,185,129,.15)}
+.fc-btn.unknown{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.06)}
+.fc-btn.unknown:hover{background:rgba(239,68,68,.12)}
+.fc-fingers{display:flex;gap:.4rem;align-items:center;margin:1rem 0}
+.fc-finger{width:10px;height:22px;border-radius:99px;border:2px solid var(--border)}
+.fc-finger.up{background:var(--accent-primary);border-color:var(--accent-primary)}
+.fc-thumb{width:13px;height:16px;border-radius:99px;border:2px solid var(--border)}
+.fc-thumb.out{background:var(--accent-secondary);border-color:var(--accent-secondary)}
+.fc-stats{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:1.25rem}
+.fc-stat{text-align:center;min-width:70px}
+.fc-stat .v{font-size:1.5rem;font-weight:800;line-height:1}
+.fc-stat .l{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em}
+.fc-dot-track{display:flex;gap:.25rem;justify-content:center;flex-wrap:wrap;margin:1rem auto;max-width:480px}
+.fc-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all .25s}
+.fc-dot.known{background:#10b981}
+.fc-dot.unknown{background:#ef4444}
+.fc-dot.current{background:var(--accent-primary);box-shadow:0 0 0 3px rgba(108,99,255,.3)}
+.fc-mode-bar{display:flex;gap:.5rem;justify-content:center;margin-bottom:1.5rem;flex-wrap:wrap}
+.fc-mode-btn{padding:.35rem .875rem;border-radius:99px;border:1.5px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);font-size:.78rem;cursor:pointer;transition:all .2s}
+.fc-mode-btn.active{border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(108,99,255,.1)}
+.fc-motion-badge{background:rgba(245,158,11,.18);color:#f59e0b;border-radius:99px;padding:.15rem .5rem;font-size:.7rem;font-weight:700;margin-left:.35rem}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container" style="max-width:640px">
+
+    <!-- Hero -->
+    <div class="fc-hero">
+      <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-secondary);margin-bottom:.5rem">Study Mode</div>
+      <h1 style="margin:0 0 .25rem">Flashcards</h1>
+      <p style="color:var(--text-secondary);margin:0">Flip through all 26 ASL letters. Mark each as Known or Still Learning.</p>
+    </div>
+
+    <!-- Mode selector -->
+    <div class="fc-mode-bar" role="group" aria-label="Deck mode">
+      <button class="fc-mode-btn active" data-mode="all">All 26</button>
+      <button class="fc-mode-btn" data-mode="static">Static only</button>
+      <button class="fc-mode-btn" data-mode="motion">Motion letters</button>
+      <button class="fc-mode-btn" data-mode="unknown">Review unknowns</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="fc-progress-wrap">
+      <div class="fc-progress-bar"><div class="fc-progress-fill" id="fc-prog-fill" style="width:0%"></div></div>
+      <div class="fc-counter">
+        <span id="fc-counter">Card 1 of 26</span>
+        <span id="fc-known-count">0 known</span>
+      </div>
+    </div>
+
+    <!-- Dot track -->
+    <div class="fc-dot-track" id="fc-dots"></div>
+
+    <!-- Card -->
+    <div class="fc-scene" id="fc-scene" role="button" tabindex="0" aria-label="Flashcard — press Enter or click to flip">
+      <div class="fc-card" id="fc-card">
+        <div class="fc-face fc-front" id="fc-front">
+          <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-secondary);margin-bottom:.25rem">Sign this letter</div>
+          <div class="fc-big-letter" id="fc-letter">A</div>
+          <div id="fc-motion" style="display:none"><span class="fc-motion-badge">Motion</span></div>
+          <div class="fc-flip-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.33"/></svg>
+            Click to reveal
+          </div>
+        </div>
+        <div class="fc-face fc-back" id="fc-back">
+          <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-primary);margin-bottom:.25rem">How to sign</div>
+          <div class="fc-big-letter" id="fc-back-letter" style="font-size:4rem;color:var(--accent-primary)">A</div>
+          <div id="fc-desc" style="font-size:.875rem;color:var(--text-secondary);text-align:center;margin-bottom:.5rem;max-width:280px"></div>
+          <div class="fc-fingers" id="fc-fingers" aria-hidden="true"></div>
+          <div id="fc-tip" style="font-size:.78rem;color:var(--accent-primary);background:rgba(108,99,255,.12);border-radius:.5rem;padding:.3rem .7rem;text-align:center;max-width:280px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="fc-controls" role="group">
+      <button class="fc-btn" id="fc-prev" aria-label="Previous card">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        Prev
+      </button>
+      <button class="fc-btn unknown" id="fc-unknown" aria-label="Mark as still learning">
+        ✗ Still Learning
+      </button>
+      <button class="fc-btn known" id="fc-known" aria-label="Mark as known">
+        ✓ Got It!
+      </button>
+      <button class="fc-btn" id="fc-next" aria-label="Next card">
+        Next
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="fc-stats">
+      <div class="fc-stat"><div class="v" id="st-known" style="color:#10b981">0</div><div class="l">Known</div></div>
+      <div class="fc-stat"><div class="v" id="st-unknown" style="color:#ef4444">0</div><div class="l">Learning</div></div>
+      <div class="fc-stat"><div class="v" id="st-left" style="color:var(--text-secondary)">26</div><div class="l">Left</div></div>
+    </div>
+
+    <!-- Shuffle / Reset -->
+    <div style="display:flex;gap:.75rem;justify-content:center;margin-top:1.25rem">
+      <button class="fc-btn" id="fc-shuffle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+        Shuffle
+      </button>
+      <button class="fc-btn" id="fc-reset">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.33"/></svg>
+        Reset
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const ASL = {
+    A:{motion:false,fingers:[0,0,0,0],thumb:1,desc:'Make a fist, thumb on the side',tip:'💡 Think: gripping something tight'},
+    B:{motion:false,fingers:[1,1,1,1],thumb:0,desc:'Flat hand, four fingers together, thumb tucked',tip:'💡 Broad flat blade'},
+    C:{motion:false,fingers:[1,1,1,1],thumb:1,desc:'Curve hand into a C shape',tip:'💡 Looks just like the letter C'},
+    D:{motion:false,fingers:[1,0,0,0],thumb:1,desc:'Index up, other fingers & thumb form circle',tip:'💡 Circle looks like the belly of D'},
+    E:{motion:false,fingers:[0,0,0,0],thumb:0,desc:'Fingers bent down, fingertips touch thumb',tip:'💡 Bent fingers look like lowercase e'},
+    F:{motion:false,fingers:[0,1,1,1],thumb:1,desc:'Index & thumb touch (OK), 3 fingers up',tip:'💡 Circle + 3 fingers = F'},
+    G:{motion:false,fingers:[1,0,0,0],thumb:1,desc:'Index & thumb point sideways horizontally',tip:'💡 Like pointing "go that way"'},
+    H:{motion:false,fingers:[1,1,0,0],thumb:0,desc:'Index & middle point sideways together',tip:'💡 Two parallel fingers = H\'s two lines'},
+    I:{motion:false,fingers:[0,0,0,1],thumb:0,desc:'Pinky finger up, all others fisted',tip:'💡 One small finger = one person "I"'},
+    J:{motion:true, fingers:[0,0,0,1],thumb:0,desc:'Pinky up, trace J shape downward',tip:'💡 Draw the letter J in the air'},
+    K:{motion:false,fingers:[1,1,0,0],thumb:1,desc:'Index up, middle angled, thumb between them',tip:'💡 Thumb between = K shape'},
+    L:{motion:false,fingers:[1,0,0,0],thumb:1,desc:'Index up, thumb out — makes an L',tip:'💡 Perfect L with index and thumb'},
+    M:{motion:false,fingers:[0,0,0,0],thumb:0,desc:'3 fingers folded over the thumb',tip:'💡 3 fingers = M has 3 humps'},
+    N:{motion:false,fingers:[0,0,0,0],thumb:0,desc:'2 fingers folded over the thumb',tip:'💡 2 fingers = N has 2 humps'},
+    O:{motion:false,fingers:[1,1,1,1],thumb:1,desc:'All fingertips meet thumb in an O',tip:'💡 Hand literally makes an O'},
+    P:{motion:false,fingers:[1,1,0,0],thumb:1,desc:'K handshape rotated to point down',tip:'💡 Downward K = P'},
+    Q:{motion:false,fingers:[1,0,0,0],thumb:1,desc:'G handshape rotated to point down',tip:'💡 Downward G = Q'},
+    R:{motion:false,fingers:[1,1,0,0],thumb:0,desc:'Index & middle fingers crossed',tip:'💡 Crossed fingers for luck'},
+    S:{motion:false,fingers:[0,0,0,0],thumb:0,desc:'Fist with thumb across front of fingers',tip:'💡 S-curl — thumb wraps over'},
+    T:{motion:false,fingers:[0,0,0,0],thumb:1,desc:'Thumb tucked between index & middle',tip:'💡 Thumb peeking out = T crossbar'},
+    U:{motion:false,fingers:[1,1,0,0],thumb:0,desc:'Index & middle together pointing up',tip:'💡 Two together = two sides of U'},
+    V:{motion:false,fingers:[1,1,0,0],thumb:0,desc:'Index & middle spread in V shape',tip:'💡 Classic peace/victory sign'},
+    W:{motion:false,fingers:[1,1,1,0],thumb:0,desc:'Index, middle & ring spread wide',tip:'💡 Three spread fingers = W'},
+    X:{motion:false,fingers:[0,0,0,0],thumb:0,desc:'Index finger bent into a hook',tip:'💡 Hook = beckoning someone'},
+    Y:{motion:false,fingers:[0,0,0,1],thumb:1,desc:'Pinky & thumb out, others fisted',tip:'💡 Hang-loose surfer sign'},
+    Z:{motion:true, fingers:[1,0,0,0],thumb:0,desc:'Index finger traces Z in the air',tip:'💡 Write the letter Z in mid-air'},
+  };
+
+  const ALL_LETTERS = Object.keys(ASL);
+  const colors = ['#6c63ff','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#8b5cf6','#f97316'];
+  const STATUS = {};  // letter → 'known' | 'unknown' | undefined
+  let deck = [...ALL_LETTERS];
+  let idx  = 0;
+  let isFlipped = false;
+  let _mode = 'all';
+
+  function buildDeck() {
+    switch (_mode) {
+      case 'static':  deck = ALL_LETTERS.filter(l => !ASL[l].motion); break;
+      case 'motion':  deck = ALL_LETTERS.filter(l =>  ASL[l].motion); break;
+      case 'unknown': deck = ALL_LETTERS.filter(l =>  STATUS[l] !== 'known'); break;
+      default:        deck = [...ALL_LETTERS];
+    }
+    if (!deck.length) deck = [...ALL_LETTERS];
+    idx = 0;
+    isFlipped = false;
+    document.getElementById('fc-card').classList.remove('flipped');
+    render();
+  }
+
+  function render() {
+    const letter = deck[idx];
+    const data   = ASL[letter];
+    const col    = colors[ALL_LETTERS.indexOf(letter) % colors.length];
+
+    /* Front */
+    document.getElementById('fc-letter').textContent     = letter;
+    document.getElementById('fc-letter').style.color     = col;
+    const motionEl = document.getElementById('fc-motion');
+    motionEl.style.display = data.motion ? '' : 'none';
+
+    /* Back */
+    document.getElementById('fc-back-letter').textContent = letter;
+    document.getElementById('fc-back-letter').style.color = col;
+    document.getElementById('fc-desc').textContent        = data.desc;
+    document.getElementById('fc-tip').textContent         = data.tip;
+
+    /* Fingers */
+    const fNames = ['Index','Middle','Ring','Pinky'];
+    let fHtml = `<div class="fc-thumb${data.thumb?' out':''}" title="Thumb: ${data.thumb?'out':'in'}"></div>`;
+    data.fingers.forEach((up, i) =>
+      fHtml += `<div class="fc-finger${up?' up':''}" title="${fNames[i]}: ${up?'up':'down'}"></div>`);
+    document.getElementById('fc-fingers').innerHTML = fHtml;
+
+    /* Progress */
+    const total  = deck.length;
+    const done   = Object.values(STATUS).filter(v => v).length;
+    const known  = Object.values(STATUS).filter(v => v==='known').length;
+    const unk    = Object.values(STATUS).filter(v => v==='unknown').length;
+    document.getElementById('fc-prog-fill').style.width  = ((idx+1)/total*100)+'%';
+    document.getElementById('fc-counter').textContent    = `Card ${idx+1} of ${total}`;
+    document.getElementById('fc-known-count').textContent= `${known} known`;
+    document.getElementById('st-known').textContent   = known;
+    document.getElementById('st-unknown').textContent = unk;
+    document.getElementById('st-left').textContent    = Math.max(0, total - done);
+
+    /* Dots */
+    document.getElementById('fc-dots').innerHTML = deck.map((l,i) => {
+      const s = STATUS[l];
+      const cls = s==='known' ? 'known' : s==='unknown' ? 'unknown' : i===idx ? 'current' : '';
+      return `<div class="fc-dot ${cls}" title="${l}: ${s||'unseen'}"></div>`;
+    }).join('');
+
+    /* Aria */
+    document.getElementById('fc-scene').setAttribute('aria-label', `Letter ${letter}: ${data.desc} — press Enter to flip`);
+  }
+
+  function flip() {
+    isFlipped = !isFlipped;
+    document.getElementById('fc-card').classList.toggle('flipped', isFlipped);
+  }
+
+  function navigate(dir) {
+    idx = (idx + dir + deck.length) % deck.length;
+    isFlipped = false;
+    document.getElementById('fc-card').classList.remove('flipped');
+    render();
+  }
+
+  function markCard(status) {
+    STATUS[deck[idx]] = status;
+    render();
+    if (idx < deck.length - 1) {
+      setTimeout(() => navigate(1), 300);
+    }
+  }
+
+  /* Events */
+  document.getElementById('fc-scene').addEventListener('click',  flip);
+  document.getElementById('fc-scene').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+    if (e.key === 'ArrowRight') navigate(1);
+    if (e.key === 'ArrowLeft')  navigate(-1);
+  });
+  document.getElementById('fc-prev').addEventListener('click',    () => navigate(-1));
+  document.getElementById('fc-next').addEventListener('click',    () => navigate(1));
+  document.getElementById('fc-known').addEventListener('click',   () => markCard('known'));
+  document.getElementById('fc-unknown').addEventListener('click', () => markCard('unknown'));
+  document.getElementById('fc-shuffle').addEventListener('click', () => {
+    deck.sort(() => Math.random() - .5);
+    idx = 0; isFlipped = false;
+    document.getElementById('fc-card').classList.remove('flipped');
+    render();
+  });
+  document.getElementById('fc-reset').addEventListener('click', () => {
+    Object.keys(STATUS).forEach(k => delete STATUS[k]);
+    buildDeck();
+  });
+
+  document.querySelectorAll('.fc-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fc-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _mode = btn.dataset.mode;
+      buildDeck();
+    });
+  });
+
+  buildDeck();
+});
+</script>
+{% endblock %}

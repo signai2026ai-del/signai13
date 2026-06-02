@@ -1,0 +1,469 @@
+{% extends "base_app.html" %}
+{% block title %}Settings — SignAI{% endblock %}
+{% block content %}
+
+<div style="padding:2rem 1.5rem">
+  <div class="container-sm">
+    <h1 style="margin-bottom:2rem">Settings</h1>
+
+    <div data-tabs class="reveal">
+      <div class="tabs" role="tablist" aria-label="Settings sections">
+        <button class="tab-btn" data-tab="tab-appearance" role="tab" aria-controls="tab-appearance">Appearance</button>
+        <button class="tab-btn" data-tab="tab-recognition" role="tab" aria-controls="tab-recognition">Recognition</button>
+        <button class="tab-btn" data-tab="tab-model" role="tab" aria-controls="tab-model">AI Model</button>
+        <button class="tab-btn" data-tab="tab-security" role="tab" aria-controls="tab-security">Security</button>
+        <div class="tab-indicator" aria-hidden="true"></div>
+      </div>
+
+      <!-- Appearance Tab -->
+      <div class="tab-panel" id="tab-appearance" role="tabpanel">
+        <div class="card" style="margin-bottom:1.25rem">
+          <h3 class="card-title" style="margin-bottom:1.25rem">Theme</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-weight:600">Dark / Light Mode</div>
+              <div style="color:var(--text-secondary);font-size:0.875rem">Persisted in your browser</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="theme-toggle" aria-label="Toggle light mode">
+              <div class="toggle-track" aria-hidden="true"></div>
+              <span class="toggle-label">Light Mode</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:1.25rem">
+          <h3 class="card-title" style="margin-bottom:1.25rem">Accent Color</h3>
+          <div class="color-swatches" role="group" aria-label="Accent color swatches">
+            <div class="color-swatch selected" data-color="#6c63ff" style="background:#6c63ff" tabindex="0" aria-label="Violet" role="button"></div>
+            <div class="color-swatch" data-color="#00d4aa" style="background:#00d4aa" tabindex="0" aria-label="Teal" role="button"></div>
+            <div class="color-swatch" data-color="#ff4757" style="background:#ff4757" tabindex="0" aria-label="Red" role="button"></div>
+            <div class="color-swatch" data-color="#ffa502" style="background:#ffa502" tabindex="0" aria-label="Amber" role="button"></div>
+            <div class="color-swatch" data-color="#2ed573" style="background:#2ed573" tabindex="0" aria-label="Green" role="button"></div>
+            <div class="color-swatch" data-color="#1e90ff" style="background:#1e90ff" tabindex="0" aria-label="Blue" role="button"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:1.25rem">Font Size</h3>
+          <div style="display:flex;gap:0.5rem" role="group" aria-label="Font size">
+            <button class="btn btn-secondary btn-sm font-size-btn active" data-size="small">Small</button>
+            <button class="btn btn-secondary btn-sm font-size-btn" data-size="medium">Medium</button>
+            <button class="btn btn-secondary btn-sm font-size-btn" data-size="large">Large</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recognition Tab -->
+      <div class="tab-panel" id="tab-recognition" role="tabpanel">
+        <div class="card" style="margin-bottom:1.25rem">
+          <h3 class="card-title" style="margin-bottom:1.25rem">Confidence Threshold</h3>
+          <label class="form-label" for="settings-threshold">
+            Current value: <strong id="thresh-display">{{ (user.confidence_threshold * 100) | int }}%</strong>
+          </label>
+          <input type="range" class="range-slider" id="settings-threshold"
+            min="0.40" max="0.95" step="0.05"
+            value="{{ user.confidence_threshold }}"
+            aria-label="Confidence threshold"
+            aria-valuemin="40" aria-valuemax="95"
+            aria-valuenow="{{ (user.confidence_threshold * 100) | int }}">
+          <div class="form-hint">Predictions below this threshold trigger a warning indicator.</div>
+        </div>
+
+        <div class="card" style="margin-bottom:1.25rem">
+          <h3 class="card-title" style="margin-bottom:1.25rem">Toggles</h3>
+          <div style="display:flex;flex-direction:column;gap:1rem">
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-hand-detect" checked aria-label="Hand detection">
+              <div class="toggle-track" aria-hidden="true"></div>
+              <span class="toggle-label">Hand detection (MediaPipe)</span>
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-landmarks" checked aria-label="Landmark overlay">
+              <div class="toggle-track" aria-hidden="true"></div>
+              <span class="toggle-label">Landmark overlay on video</span>
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-autosave" checked aria-label="Auto-save">
+              <div class="toggle-track" aria-hidden="true"></div>
+              <span class="toggle-label">Auto-save predictions to history</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Model Tab -->
+      <div class="tab-panel" id="tab-model" role="tabpanel">
+
+        <!-- Current Model Status -->
+        <div class="card" style="margin-bottom:1.25rem">
+          <h3 class="card-title" style="margin-bottom:1rem">Current Model Status</h3>
+          <div id="model-status-wrap" style="display:flex;flex-direction:column;gap:0.6rem">
+            <div style="display:flex;align-items:center;gap:0.75rem">
+              <div id="model-dot" style="width:10px;height:10px;border-radius:50%;background:#6c63ff;flex-shrink:0"></div>
+              <span id="model-type-label" style="font-weight:600">Loading...</span>
+            </div>
+            <div id="model-input-label" style="color:var(--text-secondary);font-size:0.875rem"></div>
+          </div>
+        </div>
+
+        <!-- How it works -->
+        <div class="card" style="margin-bottom:1.25rem;background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.2)">
+          <h3 class="card-title" style="margin-bottom:0.75rem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:0.4rem"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            How Model Detection Works
+          </h3>
+          <div style="color:var(--text-secondary);font-size:0.875rem;line-height:1.7">
+            <p style="margin-bottom:0.5rem">The system <strong style="color:var(--text-primary)">automatically detects</strong> the model type based on its input shape:</p>
+            <ul style="padding-left:1.25rem;margin:0;display:flex;flex-direction:column;gap:0.35rem">
+              <li><strong>Image CNN (pixel_cnn)</strong> — Input shape <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px">(None, 50, 50, 3)</code> — Your notebook-trained model</li>
+              <li><strong>Landmark DNN</strong> — Input shape <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px">(None, 63)</code> — MediaPipe landmark model</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Upload Model -->
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:1rem">Upload Trained Model</h3>
+          <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1.25rem;line-height:1.6">
+            Upload your CNN model exported from the Jupyter notebook.
+            Save it first with: <code style="background:rgba(255,255,255,0.07);padding:2px 7px;border-radius:5px">model.save('my_model.h5')</code>
+            or <code style="background:rgba(255,255,255,0.07);padding:2px 7px;border-radius:5px">model.save('my_model.keras')</code>
+          </p>
+
+          <!-- Drop zone -->
+          <div id="model-drop-zone" style="
+            border: 2px dashed rgba(108,99,255,0.4);
+            border-radius: 14px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+            background: rgba(108,99,255,0.03);
+            margin-bottom:1rem
+          " role="button" tabindex="0" aria-label="Click or drag to upload model file">
+            <div style="font-size:2.5rem;margin-bottom:0.5rem" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(108,99,255,0.6)" stroke-width="1.5" style="display:block;margin:0 auto 0.5rem"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div style="font-weight:600;margin-bottom:0.25rem" id="drop-zone-title">Drop your .h5 or .keras file here</div>
+            <div style="color:var(--text-secondary);font-size:0.825rem">or click to browse</div>
+            <input type="file" id="model-file-input" accept=".h5,.keras" style="display:none" aria-label="Model file">
+          </div>
+
+          <div id="model-file-info" style="display:none;padding:0.875rem 1rem;background:rgba(0,212,170,0.07);border:1px solid rgba(0,212,170,0.25);border-radius:10px;margin-bottom:1rem;font-size:0.875rem">
+            <div style="font-weight:600;color:#00d4aa" id="model-file-name"></div>
+            <div style="color:var(--text-secondary)" id="model-file-size"></div>
+          </div>
+
+          <div id="model-upload-error" style="display:none;padding:0.875rem 1rem;background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:10px;margin-bottom:1rem;font-size:0.875rem;color:#ff6b81">
+          </div>
+
+          <div id="model-upload-progress" style="display:none;margin-bottom:1rem">
+            <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+              <div id="model-progress-bar" style="height:100%;background:linear-gradient(90deg,#6c63ff,#00d4aa);border-radius:3px;width:0%;transition:width .3s"></div>
+            </div>
+            <div style="text-align:center;margin-top:0.5rem;font-size:0.825rem;color:var(--text-secondary)">Uploading and validating model...</div>
+          </div>
+
+          <button class="btn btn-primary" id="model-upload-btn" disabled style="gap:0.5rem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload &amp; Activate Model
+          </button>
+        </div>
+      </div>
+
+      <!-- Security Tab -->
+      <div class="tab-panel" id="tab-security" role="tabpanel">
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:1.5rem">Change Password</h3>
+          <form id="pw-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="current-pw">Current Password</label>
+              <div class="password-wrapper">
+                <input class="form-input" type="password" id="current-pw" name="current_password"
+                  autocomplete="current-password" aria-required="true" placeholder="Your current password">
+                <button type="button" class="password-toggle" aria-label="Show current password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="new-pw">New Password</label>
+              <div class="password-wrapper">
+                <input class="form-input" type="password" id="new-pw" name="new_password"
+                  autocomplete="new-password" aria-required="true" placeholder="At least 8 characters" minlength="8">
+                <button type="button" class="password-toggle" aria-label="Show new password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <div class="strength-meter"><div class="strength-bar" id="strength-bar"></div></div>
+              <div class="strength-label" id="strength-label" aria-live="polite"></div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="pw-btn">
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text">Update Password</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { apiFetch, Toast, setButtonLoading, initTabs } = window.SignAI;
+
+  // Theme toggle
+  const themeToggle = document.getElementById('theme-toggle');
+  themeToggle.checked = localStorage.getItem('signai-theme') === 'light';
+  themeToggle.addEventListener('change', () => {
+    window.SignAI.Toast.success('Theme ' + (themeToggle.checked ? 'light' : 'dark') + ' applied.');
+    // Apply via ThemeManager
+    document.querySelector('.theme-btn')?.click();
+  });
+
+  // Color swatches
+  document.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+      document.documentElement.style.setProperty('--accent-primary', sw.dataset.color);
+      Toast.success('Accent color updated.');
+    });
+    sw.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') sw.click(); });
+  });
+
+  // Font size
+  document.querySelectorAll('.font-size-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.font-size-btn').forEach(b => b.classList.remove('active','btn-primary'));
+      document.querySelectorAll('.font-size-btn').forEach(b => b.classList.add('btn-secondary'));
+      btn.classList.add('active','btn-primary');
+      btn.classList.remove('btn-secondary');
+      const sizes = { small: '14px', medium: '16px', large: '18px' };
+      document.documentElement.style.fontSize = sizes[btn.dataset.size];
+      localStorage.setItem('signai-font-size', btn.dataset.size);
+      Toast.success('Font size: ' + btn.dataset.size);
+    });
+  });
+
+  // Apply saved font size
+  const savedSize = localStorage.getItem('signai-font-size');
+  if (savedSize) {
+    document.querySelector(`[data-size="${savedSize}"]`)?.click();
+  }
+
+  // Confidence threshold
+  const slider = document.getElementById('settings-threshold');
+  const display = document.getElementById('thresh-display');
+  slider.addEventListener('input', () => {
+    display.textContent = (parseFloat(slider.value) * 100).toFixed(0) + '%';
+  });
+  slider.addEventListener('change', async () => {
+    const val = parseFloat(slider.value);
+    try {
+      const res = await apiFetch('/api/profile/threshold', {
+        method: 'POST', body: JSON.stringify({ confidence_threshold: val })
+      });
+      if (!res.data.success) throw new Error(res.data.error);
+      Toast.success('Threshold saved.');
+    } catch (err) { Toast.error(err.message); }
+  });
+
+  // Preference toggles (stored in localStorage only — preference UI)
+  ['setting-hand-detect','setting-landmarks','setting-autosave'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const stored = localStorage.getItem(id);
+    if (stored !== null) el.checked = stored === 'true';
+    el.addEventListener('change', () => {
+      localStorage.setItem(id, el.checked);
+      Toast.success(`Setting "${id.replace('setting-','')}" ${el.checked ? 'enabled' : 'disabled'}.`);
+    });
+  });
+
+  // ── AI Model Tab ─────────────────────────────────────────────────────────
+  // Load current model status
+  (async () => {
+    try {
+      const res = await fetch('/api/model_info');
+      if (!res.ok) return;
+      const data = await res.json();
+      const dot   = document.getElementById('model-dot');
+      const label = document.getElementById('model-type-label');
+      const info  = document.getElementById('model-input-label');
+      if (!dot || !label) return;
+      const t = data.model_type || 'unknown';
+      if (t === 'pixel_cnn') {
+        dot.style.background = '#00d4aa';
+        label.textContent = 'Image CNN (pixel_cnn) — Active';
+        info.textContent = 'Input: 50×50 RGB images · Your notebook-trained model';
+      } else if (t === 'landmark_dnn') {
+        dot.style.background = '#6c63ff';
+        label.textContent = 'Landmark DNN — Active';
+        info.textContent = 'Input: 63 MediaPipe hand landmark features';
+      } else if (t === 'demo') {
+        dot.style.background = '#ffa502';
+        label.textContent = 'Demo Mode (no model loaded)';
+        info.textContent = 'Upload your trained model to enable predictions.';
+      } else {
+        label.textContent = t;
+      }
+    } catch (_) {}
+  })();
+
+  // Drop zone
+  const dropZone  = document.getElementById('model-drop-zone');
+  const fileInput = document.getElementById('model-file-input');
+  const uploadBtn = document.getElementById('model-upload-btn');
+  const fileInfo  = document.getElementById('model-file-info');
+  const fileName  = document.getElementById('model-file-name');
+  const fileSize  = document.getElementById('model-file-size');
+  const errBox    = document.getElementById('model-upload-error');
+  const progress  = document.getElementById('model-upload-progress');
+  const progBar   = document.getElementById('model-progress-bar');
+
+  let selectedFile = null;
+
+  function formatBytes(b) {
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function showFile(file) {
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = formatBytes(file.size);
+    fileInfo.style.display = 'block';
+    errBox.style.display = 'none';
+    uploadBtn.disabled = false;
+    dropZone.style.borderColor = 'rgba(0,212,170,0.6)';
+  }
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) showFile(fileInput.files[0]); });
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'rgba(108,99,255,0.9)';
+    dropZone.style.background = 'rgba(108,99,255,0.08)';
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = 'rgba(108,99,255,0.4)';
+    dropZone.style.background = 'rgba(108,99,255,0.03)';
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'rgba(108,99,255,0.4)';
+    dropZone.style.background = 'rgba(108,99,255,0.03)';
+    const f = e.dataTransfer.files[0];
+    if (f && (f.name.endsWith('.h5') || f.name.endsWith('.keras'))) showFile(f);
+    else Toast.error('Only .h5 or .keras files are accepted.');
+  });
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    uploadBtn.disabled = true;
+    progress.style.display = 'block';
+    errBox.style.display = 'none';
+    progBar.style.width = '30%';
+
+    const fd = new FormData();
+    fd.append('model', selectedFile);
+
+    try {
+      progBar.style.width = '60%';
+      const res = await fetch('/api/admin/upload_model', { method: 'POST', body: fd });
+      progBar.style.width = '100%';
+      const data = await res.json();
+
+      setTimeout(() => { progress.style.display = 'none'; progBar.style.width = '0%'; }, 800);
+
+      if (data.success) {
+        Toast.success('Model uploaded! Type: ' + data.data.detected_type);
+        // Reload model status display
+        const dot   = document.getElementById('model-dot');
+        const label = document.getElementById('model-type-label');
+        const info  = document.getElementById('model-input-label');
+        if (data.data.detected_type === 'pixel_cnn') {
+          dot.style.background = '#00d4aa';
+          label.textContent = 'Image CNN (pixel_cnn) — Active';
+          info.textContent = 'Input: 50×50 RGB images · Your notebook-trained model';
+        } else {
+          dot.style.background = '#6c63ff';
+          label.textContent = 'Landmark DNN — Active';
+          info.textContent = 'Input: 63 MediaPipe hand landmark features';
+        }
+        fileInfo.style.display = 'none';
+        selectedFile = null;
+        uploadBtn.disabled = true;
+        dropZone.style.borderColor = 'rgba(108,99,255,0.4)';
+      } else {
+        errBox.textContent = data.error || 'Upload failed.';
+        errBox.style.display = 'block';
+        uploadBtn.disabled = false;
+      }
+    } catch (err) {
+      progress.style.display = 'none';
+      errBox.textContent = 'Network error: ' + err.message;
+      errBox.style.display = 'block';
+      uploadBtn.disabled = false;
+    }
+  });
+
+  // Password change
+  const pwForm = document.getElementById('pw-form');
+  const pwBtn  = document.getElementById('pw-btn');
+  const pwBar  = document.getElementById('strength-bar');
+  const pwLabel= document.getElementById('strength-label');
+  window.SignAI && initPasswordStrength
+    ? initPasswordStrength(document.getElementById('new-pw'), pwBar, pwLabel)
+    : null;
+
+  // initPasswordStrength is in main.js global scope
+  if (window.initPasswordStrength) {
+    window.initPasswordStrength(document.getElementById('new-pw'), pwBar, pwLabel);
+  } else {
+    // Inline strength
+    document.getElementById('new-pw')?.addEventListener('input', function() {
+      const p = this.value;
+      let s = 0;
+      if (p.length >= 8) s++; if (p.length >= 12) s++;
+      if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
+      if (/\d/.test(p)) s++;
+      const widths = ['0%','25%','50%','75%','100%'];
+      const colors = ['','#ff4757','#ffa502','#6c63ff','#00d4aa'];
+      const labels = ['','Weak','Fair','Strong','Very Strong'];
+      pwBar.style.width = widths[s]; pwBar.style.background = colors[s];
+      pwLabel.textContent = labels[s]; pwLabel.style.color = colors[s];
+    });
+  }
+
+  pwForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cur = document.getElementById('current-pw').value;
+    const nw  = document.getElementById('new-pw').value;
+    if (!cur || !nw) { Toast.error('Both fields are required.'); return; }
+    if (nw.length < 8) { Toast.error('New password must be at least 8 characters.'); return; }
+    setButtonLoading(pwBtn, true);
+    try {
+      const res = await apiFetch('/api/profile/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: cur, new_password: nw }),
+      });
+      if (!res.data.success) throw new Error(res.data.error);
+      Toast.success('Password updated!');
+      pwForm.reset();
+      pwBar.style.width = '0%';
+      pwLabel.textContent = '';
+    } catch (err) { Toast.error(err.message); }
+    finally { setButtonLoading(pwBtn, false); }
+  });
+});
+</script>
+{% endblock %}

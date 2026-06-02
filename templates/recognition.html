@@ -1,0 +1,227 @@
+{% extends "base_app.html" %}
+{% block title %}Recognize — SignAI{% endblock %}
+{% block head_extra %}
+<style>
+  .app-body { overflow: hidden; }
+  .recognition-layout { height: 100vh; }
+  @media (max-width: 900px) {
+    .app-body { overflow: auto; }
+    .recognition-layout { height: auto; min-height: calc(100vh - var(--topbar-height)); }
+  }
+  @media (max-width: 1024px) { .recognition-layout { height: auto; } }
+</style>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+
+<div class="recognition-layout" id="recognition-layout">
+
+  <!-- LEFT: Video Panel -->
+  <div class="video-panel" id="video-panel">
+    <!-- Top badges -->
+    <div class="video-badge-top">
+      <div class="live-badge" id="live-badge" style="display:none" aria-live="polite">
+        <span class="live-dot" aria-hidden="true"></span> LIVE
+      </div>
+      <button class="btn btn-sm btn-ghost" id="btn-start-camera" aria-label="Start camera">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        Start Camera
+      </button>
+    </div>
+
+    <!-- Camera error -->
+    <div id="camera-error" role="alert" style="display:none;position:absolute;top:4rem;left:1rem;right:1rem;background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.4);border-radius:var(--radius-sm);padding:0.75rem 1rem;color:var(--accent-danger);font-size:0.875rem;z-index:10"></div>
+
+    <!-- MJPEG video feed -->
+    <img id="video-feed" class="video-feed-img" alt="Live ASL webcam feed" style="display:none;width:100%;height:100%;object-fit:cover">
+
+    <!-- Placeholder when camera is off -->
+    <div id="camera-placeholder" style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:var(--text-secondary)">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      <p>Click <strong>Start Camera</strong> to begin</p>
+    </div>
+
+    <!-- No hand overlay -->
+    <div class="no-hand-overlay" id="no-hand-overlay" role="status" aria-live="polite">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M18 10c0-1.1-.9-2-2-2s-2 .9-2 2v-5c0-1.1-.9-2-2-2s-2 .9-2 2v1c0-1.1-.9-2-2-2s-2 .9-2 2v2c0-1.1-.9-2-2-2s-2 .9-2 2v7c0 4.4 3.6 8 8 8h2c3.3 0 6-2.7 6-6v-7z"/></svg>
+      <strong>No hand detected</strong>
+      <span style="font-size:0.875rem;color:var(--text-secondary)">Show your hand to the camera</span>
+    </div>
+
+    <!-- Camera disconnected overlay -->
+    <div class="camera-disconnected-overlay" id="disconnect-overlay" role="alert" aria-live="assertive">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-danger)" stroke-width="1.5" aria-hidden="true"><path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/><line x1="2" y1="2" x2="22" y2="22" stroke="var(--accent-danger)"/></svg>
+      <strong style="color:var(--text-primary)">Camera disconnected</strong>
+      <span style="color:var(--text-secondary);font-size:0.875rem">Click to reconnect</span>
+    </div>
+
+    <!-- Bottom overlay bar -->
+    <div class="video-overlay-bar">
+      <div class="video-pred-letter gradient-text" id="video-pred-letter">—</div>
+      <div class="video-pred-conf">
+        <div class="progress" style="height:4px;max-width:200px">
+          <div class="progress-bar" id="conf-bar" style="width:0%"></div>
+        </div>
+        <span id="conf-percent" style="font-size:0.8rem;color:var(--text-secondary)">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Prediction Panel -->
+  <div class="right-panel" id="right-panel">
+
+    <!-- Big letter + top5 -->
+    <div class="card card-glass" style="text-align:center;padding:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+        <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary)">Predicted Letter</span>
+        <button class="btn btn-ghost btn-sm" id="settings-btn" aria-label="Open settings" title="Recognition Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+      <div class="big-letter" id="big-letter" aria-live="polite" aria-atomic="true">—</div>
+
+      <!-- Low confidence warning -->
+      <div class="uncertainty-warning" id="uncertainty-warning" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Low confidence — prediction may be uncertain
+      </div>
+    </div>
+
+    <!-- Stability ring + buffer votes -->
+    <div class="card card-glass" style="padding:1rem">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Stability (7-frame window)
+        </span>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem">
+        <div class="ring-container">
+          <svg class="ring-svg" id="stability-ring" width="64" height="64" viewBox="0 0 64 64" aria-label="Stability ring" role="progressbar" aria-valuemin="0" aria-valuemax="7">
+            <circle class="ring-track" cx="32" cy="32" r="26" stroke-width="6"/>
+            <circle class="ring-fill" cx="32" cy="32" r="26" stroke-width="6" stroke-dasharray="163.4" stroke-dashoffset="163.4"/>
+          </svg>
+        </div>
+        <div style="flex:1">
+          <div id="buffer-votes" style="display:flex;flex-wrap:wrap;gap:4px" aria-live="polite"></div>
+          <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.5rem 0 0">Need 5/7 frames at ≥70% confidence to stabilize</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confidence chart -->
+    <div class="card card-glass" style="padding:1rem">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+          Letter Confidence Distribution
+        </span>
+      </div>
+      <canvas id="conf-chart" class="chart-canvas" style="height:120px" aria-label="Confidence bar chart for all 26 letters"></canvas>
+    </div>
+
+    <!-- Top 5 -->
+    <div class="card card-glass" style="padding:1rem">
+      <div class="card-title" style="margin-bottom:0.75rem;font-size:0.875rem">
+        Top Candidates
+      </div>
+      <div class="top5-panel" id="top5-panel" aria-live="polite"></div>
+    </div>
+
+    <!-- Word Builder -->
+    <div class="card card-glass" style="padding:1rem">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Word Builder
+        </span>
+        <button class="btn btn-ghost btn-sm" id="btn-reset-session" aria-label="Reset session">Reset</button>
+      </div>
+      <div class="word-builder">
+        <div class="word-display" id="word-display" aria-live="polite" aria-label="Current sentence"></div>
+      </div>
+      <div class="action-btns" style="margin-top:0.75rem">
+        <button class="btn btn-secondary btn-sm" id="btn-space" aria-label="Add space (keyboard: Space)">
+          Space <span class="kbd-hint">⎵</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-backspace" aria-label="Delete last character (keyboard: Backspace)">
+          ⌫ <span class="kbd-hint">←</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-clear" aria-label="Clear all (keyboard: Delete)">
+          Clear <span class="kbd-hint">Del</span>
+        </button>
+        <button class="btn btn-teal btn-sm" id="btn-speak" aria-label="Speak current sentence (keyboard: Enter)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          Speak <span class="kbd-hint">↵</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stop camera -->
+    <button class="btn btn-danger btn-sm" id="btn-stop-camera" style="width:100%">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
+      Stop Camera
+    </button>
+
+  </div><!-- /right-panel -->
+</div><!-- /recognition-layout -->
+
+<!-- Settings Sidebar -->
+<div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+<aside class="settings-sidebar" id="settings-sidebar" aria-label="Recognition settings">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <h3 style="font-size:1rem">Settings</h3>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('settings-sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open')" aria-label="Close settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:1.5rem">
+    <div>
+      <label class="form-label" for="threshold-slider">
+        Confidence Threshold: <span id="threshold-display">{{ (user.confidence_threshold * 100) | int }}%</span>
+      </label>
+      <input type="range" class="range-slider" id="threshold-slider"
+        min="0.40" max="0.95" step="0.05"
+        value="{{ user.confidence_threshold }}"
+        aria-label="Confidence threshold slider"
+        aria-valuemin="40" aria-valuemax="95">
+      <div class="form-hint">Letters below this confidence are flagged as uncertain.</div>
+    </div>
+
+    <div>
+      <label class="form-label" for="fps-select">Frame Rate</label>
+      <select class="form-input" id="fps-select" aria-label="Frames per second">
+        <option value="5">5 FPS</option>
+        <option value="10" selected>10 FPS</option>
+        <option value="15">15 FPS</option>
+        <option value="20">20 FPS</option>
+      </select>
+    </div>
+
+    <label class="toggle-switch">
+      <input type="checkbox" id="toggle-autosave" checked aria-label="Auto-save predictions">
+      <div class="toggle-track" aria-hidden="true"></div>
+      <span class="toggle-label">Auto-save predictions</span>
+    </label>
+
+    <label class="toggle-switch">
+      <input type="checkbox" id="toggle-sound" checked aria-label="Sound enabled">
+      <div class="toggle-track" aria-hidden="true"></div>
+      <span class="toggle-label">Sound (TTS)</span>
+    </label>
+
+    <label class="toggle-switch">
+      <input type="checkbox" id="toggle-landmarks" checked aria-label="Show hand landmarks">
+      <div class="toggle-track" aria-hidden="true"></div>
+      <span class="toggle-label">Show landmarks</span>
+    </label>
+  </div>
+</aside>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recognition.js') }}"></script>
+{% endblock %}

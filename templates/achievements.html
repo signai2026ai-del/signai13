@@ -1,0 +1,147 @@
+{% extends "base_app.html" %}
+{% block title %}Achievements — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.ach-hero{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(139,92,246,.08));border:1px solid rgba(245,158,11,.25);border-radius:1.5rem;padding:2.5rem;margin-bottom:2rem;position:relative;overflow:hidden;display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+.ach-hero::after{content:'🏆';position:absolute;right:2rem;font-size:7rem;opacity:.1;pointer-events:none}
+.ach-ring{width:100px;height:100px;border-radius:50%;background:conic-gradient(var(--accent-warning) 0%, transparent 0%);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+.ach-ring-inner{width:72px;height:72px;border-radius:50%;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem}
+.badge-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1.5rem;padding:1.5rem;display:flex;gap:1rem;align-items:flex-start;transition:all .25s;position:relative;overflow:hidden}
+.badge-card.earned{border-color:rgba(245,158,11,.4)}
+.badge-card.earned::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(245,158,11,.06),transparent);pointer-events:none}
+.badge-card:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.badge-icon{width:52px;height:52px;border-radius:1rem;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;position:relative}
+.badge-icon.locked{opacity:.35;filter:grayscale(1)}
+.lock-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.badge-title{font-weight:700;font-size:.95rem;margin-bottom:.2rem;display:flex;align-items:center;gap:.4rem}
+.badge-desc{font-size:.8rem;color:var(--text-secondary);line-height:1.4;margin-bottom:.6rem}
+.badge-prog-bar{height:4px;border-radius:99px;background:var(--border);overflow:hidden}
+.badge-prog-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.badge-prog-label{font-size:.7rem;color:var(--text-secondary);margin-top:.3rem;display:flex;justify-content:space-between}
+.streak-box{background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(245,158,11,.08));border:1.5px solid rgba(249,115,22,.3);border-radius:1rem;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem;margin-bottom:2rem}
+.streak-num{font-size:2.5rem;font-weight:900;color:#f97316;line-height:1}
+.earned-check{position:absolute;top:.75rem;right:.75rem;width:22px;height:22px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#000;font-weight:700}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="ach-hero">
+      <div class="ach-ring" id="progress-ring">
+        <div class="ach-ring-inner">
+          <div style="font-size:1.5rem;font-weight:900;line-height:1" id="earned-num">0</div>
+          <div style="font-size:.65rem;color:var(--text-secondary)">earned</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-warning);margin-bottom:.5rem">Your Achievements</div>
+        <h1 style="margin:0 0 .25rem">Badges & Milestones</h1>
+        <p style="margin:0;color:var(--text-secondary)" id="hero-subtitle">Loading your progress…</p>
+      </div>
+    </div>
+
+    <!-- Streak -->
+    <div class="streak-box" id="streak-box" style="display:none">
+      <div class="streak-num" id="streak-num">0</div>
+      <div>
+        <div style="font-weight:700;font-size:1rem">Day Streak 🔥</div>
+        <div style="font-size:.8rem;color:var(--text-secondary)">Keep practicing daily to grow your streak!</div>
+      </div>
+    </div>
+
+    <!-- Section header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h2 style="margin:0;font-size:1.1rem">All Badges</h2>
+      <span id="badge-count-label" style="font-size:.85rem;color:var(--text-secondary)"></span>
+    </div>
+
+    <!-- Badge Grid -->
+    <div class="badge-grid" id="badge-grid">
+      <!-- Loading skeleton -->
+      <div class="badge-card" style="opacity:.4"><div class="badge-icon" style="background:var(--border)"></div><div style="flex:1"><div style="height:14px;background:var(--border);border-radius:4px;margin-bottom:.5rem;width:60%"></div><div style="height:10px;background:var(--border);border-radius:4px;width:90%"></div></div></div>
+      <div class="badge-card" style="opacity:.4"><div class="badge-icon" style="background:var(--border)"></div><div style="flex:1"><div style="height:14px;background:var(--border);border-radius:4px;margin-bottom:.5rem;width:50%"></div><div style="height:10px;background:var(--border);border-radius:4px;width:80%"></div></div></div>
+      <div class="badge-card" style="opacity:.4"><div class="badge-icon" style="background:var(--border)"></div><div style="flex:1"><div style="height:14px;background:var(--border);border-radius:4px;margin-bottom:.5rem;width:70%"></div><div style="height:10px;background:var(--border);border-radius:4px;width:85%"></div></div></div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { apiFetch, Toast } = window.SignAI;
+
+  const ICONS = {
+    hand:'🤟', star:'⭐', zap:'⚡', compass:'🧭', trophy:'🏆',
+    target:'🎯', award:'🥇', flame:'🔥', calendar:'📅', default:'🏅'
+  };
+
+  async function loadAchievements() {
+    try {
+      const res = await apiFetch('/api/achievements');
+      if (!res.data.success) throw new Error(res.data.error);
+      const { badges, streak, earned, total_badges } = res.data.data;
+
+      /* Ring progress */
+      const pct = total_badges ? earned / total_badges : 0;
+      document.getElementById('progress-ring').style.background =
+        `conic-gradient(var(--accent-warning) ${pct*360}deg, var(--border) ${pct*360}deg)`;
+      document.getElementById('earned-num').textContent = earned;
+      document.getElementById('hero-subtitle').textContent =
+        `${earned} of ${total_badges} badges earned · Keep signing to unlock more!`;
+      document.getElementById('badge-count-label').textContent = `${earned}/${total_badges} unlocked`;
+
+      /* Streak */
+      if (streak > 0) {
+        document.getElementById('streak-box').style.display = 'flex';
+        document.getElementById('streak-num').textContent = streak;
+      }
+
+      /* Grid */
+      const grid = document.getElementById('badge-grid');
+      grid.innerHTML = badges.map(b => {
+        const icon    = ICONS[b.icon] || ICONS.default;
+        const progPct = b.goal ? Math.round(b.progress / b.goal * 100) : 0;
+        return `
+          <div class="badge-card ${b.earned ? 'earned' : ''}" role="article" aria-label="${b.title}: ${b.earned ? 'Earned' : 'Locked'}">
+            ${b.earned ? '<div class="earned-check" aria-label="Earned">✓</div>' : ''}
+            <div class="badge-icon ${b.earned ? '' : 'locked'}" style="background:${b.color}22">
+              <span>${icon}</span>
+              ${!b.earned ? '<div class="lock-overlay" aria-hidden="true">🔒</div>' : ''}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="badge-title" style="${b.earned ? 'color:'+b.color : ''}">
+                ${b.title}
+                ${b.earned ? '<span style="font-size:.7rem;background:'+b.color+'22;color:'+b.color+';padding:.1rem .4rem;border-radius:99px;font-weight:600">Earned</span>' : ''}
+              </div>
+              <div class="badge-desc">${b.desc}</div>
+              <div class="badge-prog-bar">
+                <div class="badge-prog-fill" style="width:${progPct}%;background:${b.color}"></div>
+              </div>
+              <div class="badge-prog-label">
+                <span>${b.progress.toLocaleString()} / ${b.goal.toLocaleString()}</span>
+                <span>${progPct}%</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+    } catch(err) {
+      Toast.error('Failed to load achievements: ' + err.message);
+      document.getElementById('badge-grid').innerHTML =
+        `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-secondary)">
+          Could not load achievements. Please try again.
+        </div>`;
+    }
+  }
+
+  loadAchievements();
+});
+</script>
+{% endblock %}

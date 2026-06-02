@@ -1,0 +1,217 @@
+{% extends "base_app.html" %}
+{% block title %}Help & Tutorial — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.help-section{margin-bottom:2.5rem}
+.help-section h2{font-size:1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:.6rem}
+.step-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1.25rem;padding:1.25rem 1.5rem;display:flex;gap:1rem;align-items:flex-start;transition:border-color .2s}
+.step-card:hover{border-color:rgba(108,99,255,.35)}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent-primary),var(--accent-secondary));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;flex-shrink:0}
+.step-content .step-title{font-weight:700;margin-bottom:.25rem}
+.step-content .step-desc{font-size:.875rem;color:var(--text-secondary);line-height:1.55;margin:0}
+.tip-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1rem;padding:1rem 1.25rem;display:flex;gap:.875rem;align-items:flex-start}
+.tip-icon{font-size:1.25rem;flex-shrink:0;margin-top:.1rem}
+.tip-title{font-weight:700;font-size:.875rem;margin-bottom:.2rem}
+.tip-desc{font-size:.82rem;color:var(--text-secondary);margin:0;line-height:1.5}
+.shortcuts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem}
+.sc-row{display:flex;justify-content:space-between;align-items:center;padding:.625rem .875rem;background:var(--bg-card);border:1.5px solid var(--border);border-radius:.875rem;font-size:.875rem}
+.sc-keys{display:flex;gap:.25rem}
+.letter-mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:.4rem}
+.lm-cell{background:var(--bg-card);border:1.5px solid var(--border);border-radius:.75rem;padding:.4rem;text-align:center;font-weight:800;font-size:1.1rem;cursor:default;transition:all .2s;position:relative}
+.lm-cell:hover{border-color:var(--accent-primary);transform:scale(1.08)}
+.lm-cell.motion-letter::after{content:'~';position:absolute;top:.1rem;right:.25rem;font-size:.55rem;color:#f59e0b;font-weight:900}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container" style="max-width:860px">
+
+    <!-- Header -->
+    <div style="margin-bottom:2rem">
+      <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-primary);margin-bottom:.5rem">Documentation</div>
+      <h1 style="margin:0 0 .5rem">Help & Tutorial</h1>
+      <p style="margin:0;color:var(--text-secondary)">Everything you need to get started with SignAI — tips, shortcuts, and guidance.</p>
+    </div>
+
+    <!-- Getting Started -->
+    <div class="help-section">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Getting Started
+      </h2>
+      <div style="display:flex;flex-direction:column;gap:.75rem">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Create your account</div>
+            <p class="step-desc">Sign up with your name and email. It's free, no credit card required. Your progress, history, and achievements are saved automatically.</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Allow camera access</div>
+            <p class="step-desc">Navigate to the <a href="{{ url_for('recognition') }}">Recognize</a> page and click "Open Camera". The AI reads frames on the server — no video data is stored.</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Position your hand</div>
+            <p class="step-desc">Hold your hand 1–2 feet from the camera, palm facing forward. Keep your hand within the frame and ensure good lighting.</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Sign letters and build words</div>
+            <p class="step-desc">Hold each sign steady for ~1 second. Confirmed letters are added to the word builder automatically. Use Space to add a space and backspace to delete.</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title">Explore learning tools</div>
+            <p class="step-desc">Use the <a href="{{ url_for('dictionary') }}">Dictionary</a> to study each letter, <a href="{{ url_for('flashcards') }}">Flashcards</a> to memorize them, and <a href="{{ url_for('practice') }}">Practice Mode</a> to test your skills with a scored game.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Tips -->
+    <div class="help-section">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        Camera Tips for Best Accuracy
+      </h2>
+      <div class="help-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem">
+        <div class="tip-card"><div class="tip-icon">💡</div><div><div class="tip-title">Good lighting</div><p class="tip-desc">Use a lamp or face a window. Avoid bright backlighting — it silhouettes your hand and reduces accuracy.</p></div></div>
+        <div class="tip-card"><div class="tip-icon">✋</div><div><div class="tip-title">Palm facing camera</div><p class="tip-desc">For most letters, your palm should face the camera directly. Keep your hand upright and steady.</p></div></div>
+        <div class="tip-card"><div class="tip-icon">📏</div><div><div class="tip-title">Correct distance</div><p class="tip-desc">Keep your hand 30–60 cm (1–2 feet) from the camera. Too close or too far reduces landmark detection.</p></div></div>
+        <div class="tip-card"><div class="tip-icon">🎨</div><div><div class="tip-title">Plain background</div><p class="tip-desc">A plain, contrasting background behind your hand helps MediaPipe detect your hand landmarks accurately.</p></div></div>
+        <div class="tip-card"><div class="tip-icon">⏱️</div><div><div class="tip-title">Hold steady</div><p class="tip-desc">Hold each sign for at least 1 second. The AI needs 3–5 consistent frames before confirming a letter.</p></div></div>
+        <div class="tip-card"><div class="tip-icon">🔄</div><div><div class="tip-title">Motion letters</div><p class="tip-desc">Letters J and Z require movement. Trace the shape clearly and steadily — slower movements work better.</p></div></div>
+      </div>
+    </div>
+
+    <!-- Quick Letter Reference -->
+    <div class="help-section">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-warning)" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Quick Letter Reference
+        <span style="font-size:.75rem;color:var(--text-secondary);font-weight:400">~ = motion letter</span>
+      </h2>
+      <div class="letter-mini-grid">
+        {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        <a href="{{ url_for('dictionary') }}" class="lm-cell {% if letter in ['J','Z'] %}motion-letter{% endif %}"
+           title="{{ letter }} — click to view in Dictionary">{{ letter }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="help-section">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+        Keyboard Shortcuts
+      </h2>
+      <div class="shortcuts-grid">
+        <div class="sc-row"><span>Add space to word</span><div class="sc-keys"><kbd class="kbd">Space</kbd></div></div>
+        <div class="sc-row"><span>Delete last letter</span><div class="sc-keys"><kbd class="kbd">⌫</kbd></div></div>
+        <div class="sc-row"><span>Clear word</span><div class="sc-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">⌫</kbd></div></div>
+        <div class="sc-row"><span>Read aloud (TTS)</span><div class="sc-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">S</kbd></div></div>
+        <div class="sc-row"><span>Open camera</span><div class="sc-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">E</kbd></div></div>
+        <div class="sc-row"><span>Flashcard flip</span><div class="sc-keys"><kbd class="kbd">Enter</kbd></div></div>
+        <div class="sc-row"><span>Next flashcard</span><div class="sc-keys"><kbd class="kbd">→</kbd></div></div>
+        <div class="sc-row"><span>Previous flashcard</span><div class="sc-keys"><kbd class="kbd">←</kbd></div></div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="help-section">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Frequently Asked Questions
+      </h2>
+      <div id="faq-list">
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            Why is the AI not recognizing my hand?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">Check that your hand is in the frame, well-lit, and at an appropriate distance (1–2 feet). Make sure your palm faces the camera. If MediaPipe can't detect landmarks, no prediction will be made — the "No hand" indicator will show.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            Is my video or camera feed stored anywhere?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">No. SignAI uses server-side OpenCV to capture frames, run MediaPipe hand landmark detection, and classify the pose. Only the predicted letter and confidence score are stored — never raw video or images.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            How accurate is the recognition?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">Under good lighting conditions, the model achieves 80–95% accuracy on static letters. Motion letters (J, Z) are harder to classify. Confidence scores below 75% are filtered out to reduce false positives.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            Why does the app work without a database?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">SignAI can run in "demo mode" without MySQL. In this mode, recognition, the dictionary, flashcards, and practice mode all work — but your history, achievements, and progress data won't be saved between sessions.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            Can I use SignAI on mobile?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">The web interface is fully responsive and works on mobile browsers. However, since recognition uses a server-side camera (OpenCV), a physical webcam connected to the server is required — the mobile camera itself cannot be used directly.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+            How do I reset my progress or delete my account?
+            <svg class="faq-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-answer">Go to <a href="{{ url_for('settings') }}">Settings</a> to clear your prediction history or delete your account entirely. These actions are permanent and cannot be undone.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="card" style="padding:1.5rem;text-align:center">
+      <div style="font-size:1.5rem;margin-bottom:.75rem">🤟</div>
+      <div style="font-weight:700;margin-bottom:.5rem">Ready to start signing?</div>
+      <div style="font-size:.875rem;color:var(--text-secondary);margin-bottom:1.25rem">Jump into any of the learning tools or start recognizing right away.</div>
+      <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
+        <a href="{{ url_for('recognition') }}" class="btn btn-primary">Start Recognizing</a>
+        <a href="{{ url_for('dictionary') }}"  class="btn btn-secondary">View Dictionary</a>
+        <a href="{{ url_for('flashcards') }}"  class="btn btn-secondary">Flashcards</a>
+        <a href="{{ url_for('practice') }}"    class="btn btn-secondary">Practice Mode</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* FAQ accordion */
+  document.querySelectorAll('.faq-question').forEach(q => {
+    q.addEventListener('click', toggle);
+    q.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle.call(q);} });
+    function toggle() {
+      const item = q.closest('.faq-item');
+      const open = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(i => { i.classList.remove('open'); i.querySelector('.faq-question').setAttribute('aria-expanded','false'); });
+      if (!open) { item.classList.add('open'); q.setAttribute('aria-expanded','true'); }
+    }
+  });
+});
+</script>
+{% endblock %}

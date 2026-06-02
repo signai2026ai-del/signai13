@@ -1,0 +1,321 @@
+{% extends "base_app.html" %}
+{% block title %}ASL Dictionary — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.dict-hero{background:linear-gradient(135deg,rgba(108,99,255,.15),rgba(0,212,170,.08));border:1px solid rgba(108,99,255,.2);border-radius:1.5rem;padding:2.5rem;margin-bottom:2rem;position:relative;overflow:hidden}
+.dict-hero::before{content:'🤟';position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:6rem;opacity:.12;pointer-events:none}
+.search-bar{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:1.5rem}
+.search-input{flex:1;min-width:200px;padding:.6rem 1rem;border-radius:.75rem;border:1.5px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:.95rem;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--accent-primary)}
+.filter-chips{display:flex;gap:.5rem;flex-wrap:wrap}
+.chip{padding:.35rem .9rem;border-radius:99px;border:1.5px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);font-size:.8rem;cursor:pointer;transition:all .2s}
+.chip.active,.chip:hover{border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(108,99,255,.1)}
+.letter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.25rem}
+.letter-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1.25rem;padding:1.5rem;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.letter-card:hover{transform:translateY(-4px);border-color:var(--accent-primary);box-shadow:0 8px 32px rgba(108,99,255,.2)}
+.letter-card.active{border-color:var(--accent-primary);background:rgba(108,99,255,.06)}
+.letter-card::after{content:attr(data-letter);position:absolute;right:.5rem;top:-.5rem;font-size:6rem;font-weight:900;opacity:.04;pointer-events:none;line-height:1}
+.letter-big{font-size:3.5rem;font-weight:900;line-height:1;margin-bottom:.5rem}
+.letter-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:.5rem}
+.letter-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.5;margin-bottom:.75rem}
+.letter-fingers{display:flex;gap:.4rem;align-items:center;margin-bottom:.5rem}
+.finger{width:10px;height:22px;border-radius:99px;border:2px solid var(--border);transition:all .2s}
+.finger.up{background:var(--accent-primary);border-color:var(--accent-primary)}
+.finger.thumb{width:13px;height:16px;border-radius:99px}
+.finger.thumb.out{background:var(--accent-secondary);border-color:var(--accent-secondary)}
+.letter-tip{font-size:.75rem;color:var(--accent-primary);font-weight:500;background:rgba(108,99,255,.1);border-radius:.5rem;padding:.25rem .5rem}
+.detail-modal{display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;padding:1rem}
+.detail-modal.show{display:flex}
+.modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.modal-box{position:relative;background:var(--bg-card);border:1.5px solid var(--border);border-radius:2rem;padding:2.5rem;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;z-index:1;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.modal-letter{font-size:8rem;font-weight:900;line-height:1;text-align:center;margin:.5rem 0}
+.modal-close{position:absolute;top:1rem;right:1rem;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:1.2rem}
+.steps-list{list-style:none;padding:0;counter-reset:steps}
+.steps-list li{counter-increment:steps;display:flex;align-items:flex-start;gap:.75rem;margin-bottom:.75rem;font-size:.9rem;color:var(--text-secondary)}
+.steps-list li::before{content:counter(steps);min-width:24px;height:24px;border-radius:50%;background:rgba(108,99,255,.2);color:var(--accent-primary);font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;margin-top:.1rem;flex-shrink:0}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="dict-hero">
+      <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-primary);margin-bottom:.5rem">Reference Guide</div>
+      <h1 style="margin:0 0 .5rem">ASL Dictionary</h1>
+      <p style="margin:0;color:var(--text-secondary);max-width:460px">Complete reference for all 26 American Sign Language alphabet letters — descriptions, finger positions, and memory tips.</p>
+      <div style="display:flex;gap:1.5rem;margin-top:1.25rem;flex-wrap:wrap">
+        <div><span style="font-size:1.5rem;font-weight:800;color:var(--accent-primary)">26</span> <span style="font-size:.8rem;color:var(--text-secondary)">Letters</span></div>
+        <div><span style="font-size:1.5rem;font-weight:800;color:var(--accent-secondary)" id="learned-count">0</span> <span style="font-size:.8rem;color:var(--text-secondary)">Practiced</span></div>
+        <div><span style="font-size:1.5rem;font-weight:800;color:var(--accent-warning)" id="mastered-count">0</span> <span style="font-size:.8rem;color:var(--text-secondary)">Mastered</span></div>
+      </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="search-bar">
+      <input class="search-input" type="search" id="search" placeholder="Search letters or descriptions…" aria-label="Search letters">
+      <div class="filter-chips" role="group" aria-label="Filter">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="static">Static</button>
+        <button class="chip" data-filter="motion">Motion</button>
+        <button class="chip" data-filter="practiced">Practiced</button>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="letter-grid" id="letter-grid"></div>
+
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="detail-modal" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal-box">
+    <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    <div class="modal-letter" id="modal-letter" style="color:var(--accent-primary)">A</div>
+    <h2 id="modal-title" style="text-align:center;margin:.25rem 0 .5rem">Letter A</h2>
+    <p id="modal-desc" style="text-align:center;color:var(--text-secondary);font-size:.9rem;margin-bottom:1.25rem"></p>
+    <div id="modal-fingers" style="display:flex;gap:.5rem;justify-content:center;margin-bottom:1.5rem"></div>
+    <h4 style="margin:0 0 .75rem;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary)">How to sign</h4>
+    <ul class="steps-list" id="modal-steps"></ul>
+    <div id="modal-tip" style="margin-top:1rem;padding:.75rem;background:rgba(108,99,255,.1);border-radius:.75rem;font-size:.85rem;color:var(--accent-primary)"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { apiFetch } = window.SignAI;
+
+  /* ── ASL Data ─────────────────────────────────────────────── */
+  const ASL = {
+    A:{ color:'#6c63ff', motion:false, fingers:[0,0,0,0], thumb:1,
+        desc:'Fist with thumb on the side',
+        steps:['Make a fist with all four fingers curled in','Rest your thumb alongside your index finger','Keep your fist upright and facing forward'],
+        tip:'💡 Think of a closed fist — like gripping something tight'},
+    B:{ color:'#10b981', motion:false, fingers:[1,1,1,1], thumb:0,
+        desc:'Flat hand, fingers together, thumb tucked in',
+        steps:['Hold four fingers straight up and together','Tuck your thumb across your palm','Face your palm outward'],
+        tip:'💡 B is "Broad" — like a flat blade'},
+    C:{ color:'#f59e0b', motion:false, fingers:[1,1,1,1], thumb:1,
+        desc:'Curved hand forming the letter C',
+        steps:['Curve all your fingers and thumb into a C shape','Keep the hand open — neither a fist nor flat','Face the C shape to the side'],
+        tip:'💡 Looks just like the letter C itself'},
+    D:{ color:'#ef4444', motion:false, fingers:[1,0,0,0], thumb:1,
+        desc:'Index up, other fingers and thumb touch',
+        steps:['Point your index finger straight up','Curl your middle, ring, and pinky fingers','Touch your thumb to the tips of those curled fingers'],
+        tip:'💡 The circle formed looks like the belly of a D'},
+    E:{ color:'#8b5cf6', motion:false, fingers:[0,0,0,0], thumb:0,
+        desc:'Fingers bent, fingertips touch thumb',
+        steps:['Bend all four fingers at the middle joint','Press your fingertips down to your thumb','Keep your palm facing outward'],
+        tip:'💡 The bent fingers look like a lowercase e'},
+    F:{ color:'#06b6d4', motion:false, fingers:[0,1,1,1], thumb:1,
+        desc:'Index and thumb touch, other fingers up',
+        steps:['Touch your index fingertip to your thumb tip (OK shape)','Hold middle, ring, and pinky fingers straight up','Face your palm outward'],
+        tip:'💡 The circle looks like an F through the gaps'},
+    G:{ color:'#ec4899', motion:false, fingers:[1,0,0,0], thumb:1,
+        desc:'Index and thumb horizontal, pointing to the side',
+        steps:['Point your index finger to the side (horizontal)','Extend your thumb parallel to index','Keep other fingers curled in'],
+        tip:'💡 Hand points like you are indicating "go that way"'},
+    H:{ color:'#10b981', motion:false, fingers:[1,1,0,0], thumb:0,
+        desc:'Index and middle horizontal, pointing sideways',
+        steps:['Point index and middle fingers sideways (horizontal)','Keep them together and flat','Curl ring and pinky inward'],
+        tip:'💡 Two parallel fingers — like two lines in a capital H'},
+    I:{ color:'#f59e0b', motion:false, fingers:[0,0,0,1], thumb:0,
+        desc:'Pinky finger up, others in a fist',
+        steps:['Make a fist','Extend only your pinky finger upward','Keep all other fingers and thumb closed'],
+        tip:'💡 One small finger — "I" is one person!'},
+    J:{ color:'#6c63ff', motion:true, fingers:[0,0,0,1], thumb:0,
+        desc:'Pinky up, trace a J shape downward',
+        steps:['Start with pinky up (same as I)','Move your hand down, then curve left','Trace the shape of the letter J in the air'],
+        tip:'💡 Motion letter — actually draw a J with your pinky'},
+    K:{ color:'#ef4444', motion:false, fingers:[1,1,0,0], thumb:1,
+        desc:'Index up, middle angled out, thumb between them',
+        steps:['Point index finger straight up','Point middle finger at an angle','Place thumb between the index and middle fingers'],
+        tip:'💡 The thumb between fingers makes the K shape'},
+    L:{ color:'#8b5cf6', motion:false, fingers:[1,0,0,0], thumb:1,
+        desc:'L-shape: index up, thumb out to the side',
+        steps:['Point your index finger straight up','Extend your thumb out to the side','Keep other fingers curled in'],
+        tip:'💡 Makes a perfect L shape with index and thumb'},
+    M:{ color:'#06b6d4', motion:false, fingers:[0,0,0,0], thumb:0,
+        desc:'Three fingers folded over thumb',
+        steps:['Tuck your thumb under your fingers','Fold index, middle, and ring fingers over the thumb','Keep pinky curled in'],
+        tip:'💡 Three fingers = M has three humps'},
+    N:{ color:'#ec4899', motion:false, fingers:[0,0,0,0], thumb:0,
+        desc:'Two fingers folded over thumb',
+        steps:['Tuck thumb under your fingers','Fold only index and middle fingers over thumb','Keep ring and pinky curled in'],
+        tip:'💡 Two fingers = N has two humps'},
+    O:{ color:'#10b981', motion:false, fingers:[1,1,1,1], thumb:1,
+        desc:'All fingers meet thumb forming an O',
+        steps:['Curve all four fingers downward','Touch all fingertips to your thumb tip','Form a round O shape'],
+        tip:'💡 The hand literally makes an O shape'},
+    P:{ color:'#f59e0b', motion:false, fingers:[1,1,0,0], thumb:1,
+        desc:'K handshape pointing downward',
+        steps:['Form the K handshape','Rotate your wrist so it points downward','The hand angle distinguishes P from K'],
+        tip:'💡 P is a downward K — same fingers, different angle'},
+    Q:{ color:'#6c63ff', motion:false, fingers:[1,0,0,0], thumb:1,
+        desc:'G handshape pointing downward',
+        steps:['Form the G handshape (index and thumb out)','Rotate wrist so the fingers point downward','Palm faces inward'],
+        tip:'💡 Q is a downward G'},
+    R:{ color:'#ef4444', motion:false, fingers:[1,1,0,0], thumb:0,
+        desc:'Index and middle fingers crossed',
+        steps:['Extend index and middle fingers upward','Cross the middle finger over the index','Keep ring and pinky down'],
+        tip:'💡 Crossed fingers — like crossing your fingers for luck'},
+    S:{ color:'#8b5cf6', motion:false, fingers:[0,0,0,0], thumb:0,
+        desc:'Fist with thumb over fingers',
+        steps:['Make a firm fist','Lay your thumb across the front of your fingers','Face your fist forward'],
+        tip:'💡 Like an S-curl — thumb wraps over the front'},
+    T:{ color:'#06b6d4', motion:false, fingers:[0,0,0,0], thumb:1,
+        desc:'Thumb tucked between index and middle fingers',
+        steps:['Make a fist','Push your thumb up between index and middle finger','Face forward'],
+        tip:'💡 The thumb peeking out represents the T crossbar'},
+    U:{ color:'#ec4899', motion:false, fingers:[1,1,0,0], thumb:0,
+        desc:'Index and middle together pointing up',
+        steps:['Extend index and middle fingers straight up together','Keep them touching side by side','Curl ring, pinky and thumb in'],
+        tip:'💡 Two fingers together — like two sides of a U'},
+    V:{ color:'#10b981', motion:false, fingers:[1,1,0,0], thumb:0,
+        desc:'Index and middle spread in a V shape',
+        steps:['Extend index and middle fingers upward','Spread them apart in a V shape','Keep ring and pinky down'],
+        tip:'💡 Classic peace sign — V for Victory and for V!'},
+    W:{ color:'#f59e0b', motion:false, fingers:[1,1,1,0], thumb:0,
+        desc:'Three fingers up and spread wide',
+        steps:['Extend index, middle and ring fingers upward','Spread them apart','Keep pinky and thumb down'],
+        tip:'💡 Three spread fingers form the W shape'},
+    X:{ color:'#6c63ff', motion:false, fingers:[0,0,0,0], thumb:0,
+        desc:'Index finger bent like a hook',
+        steps:['Extend your index finger','Bend it at the middle joint into a hook/hook shape','Keep all other fingers closed'],
+        tip:'💡 The hook of X — like beckoning someone'},
+    Y:{ color:'#ef4444', motion:false, fingers:[0,0,0,1], thumb:1,
+        desc:'Pinky and thumb extended, others in fist',
+        steps:['Extend only your pinky and thumb outward','Keep index, middle, ring fingers curled in','Spread pinky and thumb wide'],
+        tip:'💡 Hang-loose surfer sign — Y shape!'},
+    Z:{ color:'#8b5cf6', motion:true, fingers:[1,0,0,0], thumb:0,
+        desc:'Index finger traces Z in the air',
+        steps:['Point your index finger forward','Draw a horizontal line to the right','Then diagonal down-left, then horizontal right again'],
+        tip:'💡 You literally write the letter Z in the air'},
+  };
+
+  let practicedLetters = new Set();
+  let masteredLetters  = new Set();
+  let _activeFilter    = 'all';
+  let _search          = '';
+  let _openLetter      = null;
+
+  /* Load practiced data from progress API */
+  apiFetch('/api/progress').then(res => {
+    if (!res.data.success) return;
+    const letters = res.data.data.letters || [];
+    letters.forEach(l => {
+      if (l.count > 0)  practicedLetters.add(l.letter);
+      if (l.count > 10) masteredLetters.add(l.letter);
+    });
+    document.getElementById('learned-count').textContent  = practicedLetters.size;
+    document.getElementById('mastered-count').textContent = masteredLetters.size;
+    renderGrid();
+  }).catch(() => renderGrid());
+
+  function renderGrid() {
+    const grid = document.getElementById('letter-grid');
+    const q    = _search.toLowerCase();
+    let count  = 0;
+
+    grid.innerHTML = Object.entries(ASL).filter(([letter, data]) => {
+      if (q && !letter.toLowerCase().includes(q) && !data.desc.toLowerCase().includes(q)) return false;
+      if (_activeFilter === 'static'    && data.motion)                    return false;
+      if (_activeFilter === 'motion'    && !data.motion)                   return false;
+      if (_activeFilter === 'practiced' && !practicedLetters.has(letter))  return false;
+      return true;
+    }).map(([letter, data]) => {
+      count++;
+      const practiced = practicedLetters.has(letter);
+      const mastered  = masteredLetters.has(letter);
+      const fingerHtml = renderFingers(data.fingers, data.thumb);
+      return `
+        <div class="letter-card reveal" data-letter="${letter}" tabindex="0" role="button"
+             aria-label="Letter ${letter}: ${data.desc}"
+             style="border-color: ${mastered ? '#f59e0b' : (practiced ? data.color : '')}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
+            <div class="letter-big" style="color:${data.color}">${letter}</div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem">
+              ${data.motion ? '<span class="badge" style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:.65rem">Motion</span>' : '<span class="badge" style="background:rgba(16,185,129,.1);color:#10b981;font-size:.65rem">Static</span>'}
+              ${mastered  ? '<span class="badge" style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:.65rem">★ Mastered</span>' : ''}
+              ${practiced && !mastered ? '<span class="badge" style="background:rgba(108,99,255,.12);color:var(--accent-primary);font-size:.65rem">Practiced</span>' : ''}
+            </div>
+          </div>
+          <div class="letter-label">Hand position</div>
+          <div class="letter-desc">${data.desc}</div>
+          <div class="letter-fingers" aria-hidden="true">${fingerHtml}</div>
+          <div class="letter-tip">${data.tip}</div>
+        </div>`;
+    }).join('');
+
+    if (count === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-secondary)">
+        No letters match your search.</div>`;
+    }
+
+    /* Attach click handlers */
+    grid.querySelectorAll('.letter-card').forEach(card => {
+      card.addEventListener('click',   () => openModal(card.dataset.letter));
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openModal(card.dataset.letter); });
+    });
+  }
+
+  function renderFingers(fingers, thumb) {
+    const names = ['Index','Middle','Ring','Pinky'];
+    let html = `<div class="finger thumb${thumb ? ' out' : ''}" title="Thumb: ${thumb ? 'out' : 'in'}"></div>`;
+    fingers.forEach((up, i) => {
+      html += `<div class="finger${up ? ' up' : ''}" title="${names[i]}: ${up ? 'up' : 'down'}"></div>`;
+    });
+    return html;
+  }
+
+  function openModal(letter) {
+    const data = ASL[letter];
+    _openLetter = letter;
+    document.getElementById('modal-letter').textContent  = letter;
+    document.getElementById('modal-letter').style.color  = data.color;
+    document.getElementById('modal-title').textContent   = `Letter ${letter}`;
+    document.getElementById('modal-desc').textContent    = data.desc;
+    document.getElementById('modal-tip').textContent     = data.tip;
+    document.getElementById('modal-fingers').innerHTML   = renderFingers(data.fingers, data.thumb);
+    document.getElementById('modal-steps').innerHTML     =
+      data.steps.map(s => `<li>${s}</li>`).join('');
+    document.getElementById('detail-modal').classList.add('show');
+    document.getElementById('modal-close').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('detail-modal').classList.remove('show');
+    _openLetter = null;
+  }
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  /* Search */
+  document.getElementById('search').addEventListener('input', e => {
+    _search = e.target.value;
+    renderGrid();
+  });
+
+  /* Filter chips */
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      _activeFilter = chip.dataset.filter;
+      renderGrid();
+    });
+  });
+
+  renderGrid();
+});
+</script>
+{% endblock %}

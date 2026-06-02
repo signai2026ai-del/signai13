@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Create Account — SignAI{% endblock %}
+{% set hide_navbar = true %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<div class="auth-stars-page">
+
+  <canvas class="auth-stars-canvas" id="authStarsCanvas" aria-hidden="true"></canvas>
+
+  <!-- Landscape: mountains + trees -->
+  <div class="auth-landscape" aria-hidden="true">
+    <svg viewBox="0 0 1440 220" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,180 L90,110 L180,160 L310,60 L420,140 L540,80 L650,130 L760,50 L870,120 L990,55 L1110,115 L1230,65 L1350,105 L1440,80 L1440,220 L0,220 Z" fill="#1e0a50" opacity="0.85"/>
+      <path d="M0,200 L80,155 L170,185 L280,120 L390,170 L490,130 L600,165 L720,105 L840,155 L960,115 L1080,150 L1200,120 L1320,148 L1440,130 L1440,220 L0,220 Z" fill="#150736" opacity="0.95"/>
+    </svg>
+    <svg viewBox="0 0 1440 110" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="
+        M0,110 L0,75 L12,75 L12,55 L18,55 L18,35 L24,35 L24,20 L30,20 L30,35 L36,35 L36,55 L42,55 L42,75 L54,75 L54,58 L60,58 L60,42 L66,42 L66,28 L72,28 L72,42 L78,42 L78,58 L90,58 L90,70 L96,70 L96,50 L102,50 L102,32 L108,32 L108,18 L114,18 L114,32 L120,32 L120,50 L126,50 L126,70
+        L138,70 L138,55 L144,55 L144,38 L150,38 L150,24 L156,24 L156,38 L162,38 L162,55 L168,55 L168,70
+        L180,70 L180,58 L186,58 L186,40 L192,40 L192,26 L198,26 L198,40 L204,40 L204,58 L210,58 L210,70
+        L222,70 L222,52 L228,52 L228,35 L234,35 L234,20 L240,20 L240,35 L246,35 L246,52 L252,52 L252,70
+        L264,70 L264,58 L270,58 L270,44 L276,44 L276,30 L282,30 L282,44 L288,44 L288,58 L294,58 L294,70
+        L306,70 L306,54 L312,54 L312,36 L318,36 L318,22 L324,22 L324,36 L330,36 L330,54 L336,54 L336,70
+        L348,70 L348,58 L354,58 L354,42 L360,42 L360,28 L366,28 L366,42 L372,42 L372,58 L378,58 L378,70
+        L390,70 L390,52 L396,52 L396,35 L402,35 L402,20 L408,20 L408,35 L414,35 L414,52 L420,52 L420,70
+        L432,70 L432,58 L438,58 L438,40 L444,40 L444,25 L450,25 L450,40 L456,40 L456,58 L462,58 L462,70
+        L474,70 L474,54 L480,54 L480,38 L486,38 L486,22 L492,22 L492,38 L498,38 L498,54 L504,54 L504,70
+        L516,70 L516,58 L522,58 L522,42 L528,42 L528,30 L534,30 L534,42 L540,42 L540,58 L546,58 L546,70
+        L558,70 L558,52 L564,52 L564,36 L570,36 L570,20 L576,20 L576,36 L582,36 L582,52 L588,52 L588,70
+        L600,70 L600,58 L606,58 L606,44 L612,44 L612,28 L618,28 L618,44 L624,44 L624,58 L630,58 L630,70
+        L642,70 L642,55 L648,55 L648,38 L654,38 L654,24 L660,24 L660,38 L666,38 L666,55 L672,55 L672,70
+        L684,70 L684,58 L690,58 L690,40 L696,40 L696,26 L702,26 L702,40 L708,40 L708,58 L714,58 L714,70
+        L726,70 L726,52 L732,52 L732,35 L738,35 L738,22 L744,22 L744,35 L750,35 L750,52 L756,52 L756,70
+        L768,70 L768,58 L774,58 L774,42 L780,42 L780,28 L786,28 L786,42 L792,42 L792,58 L798,58 L798,70
+        L810,70 L810,55 L816,55 L816,36 L822,36 L822,22 L828,22 L828,36 L834,36 L834,55 L840,55 L840,70
+        L852,70 L852,58 L858,58 L858,40 L864,40 L864,24 L870,24 L870,40 L876,40 L876,58 L882,58 L882,70
+        L894,70 L894,52 L900,52 L900,35 L906,35 L906,20 L912,20 L912,35 L918,35 L918,52 L924,52 L924,70
+        L936,70 L936,58 L942,58 L942,42 L948,42 L948,28 L954,28 L954,42 L960,42 L960,58 L966,58 L966,70
+        L978,70 L978,55 L984,55 L984,38 L990,38 L990,24 L996,24 L996,38 L1002,38 L1002,55 L1008,55 L1008,70
+        L1020,70 L1020,58 L1026,58 L1026,40 L1032,40 L1032,26 L1038,26 L1038,40 L1044,40 L1044,58 L1050,58 L1050,70
+        L1062,70 L1062,52 L1068,52 L1068,36 L1074,36 L1074,22 L1080,22 L1080,36 L1086,36 L1086,52 L1092,52 L1092,70
+        L1104,70 L1104,58 L1110,58 L1110,42 L1116,42 L1116,28 L1122,28 L1122,42 L1128,42 L1128,58 L1134,58 L1134,70
+        L1146,70 L1146,55 L1152,55 L1152,38 L1158,38 L1158,24 L1164,24 L1164,38 L1170,38 L1170,55 L1176,55 L1176,70
+        L1188,70 L1188,58 L1194,58 L1194,40 L1200,40 L1200,26 L1206,26 L1206,40 L1212,40 L1212,58 L1218,58 L1218,70
+        L1230,70 L1230,52 L1236,52 L1236,36 L1242,36 L1242,20 L1248,20 L1248,36 L1254,36 L1254,52 L1260,52 L1260,70
+        L1272,70 L1272,58 L1278,58 L1278,44 L1284,44 L1284,28 L1290,28 L1290,44 L1296,44 L1296,58 L1302,58 L1302,70
+        L1314,70 L1314,55 L1320,55 L1320,38 L1326,38 L1326,24 L1332,24 L1332,38 L1338,38 L1338,55 L1344,55 L1344,70
+        L1356,70 L1356,58 L1362,58 L1362,42 L1368,42 L1368,28 L1374,28 L1374,42 L1380,42 L1380,58 L1386,58 L1386,70
+        L1398,70 L1398,52 L1404,52 L1404,36 L1410,36 L1410,22 L1416,22 L1416,36 L1422,36 L1422,52 L1428,52 L1428,70
+        L1440,70 L1440,110 L0,110 Z
+      " fill="#0a0220"/>
+    </svg>
+  </div>
+
+  <!-- Glass Card -->
+  <div class="auth-glass-card">
+
+    <div class="auth-glass-top">
+      <a href="{{ url_for('index') }}" class="auth-glass-logo" aria-label="SignAI Home">
+        <div class="auth-glass-logo-mark">
+          <svg viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="2.5" width="20" height="20" aria-hidden="true">
+            <path d="M8 12C8 12 10 8 16 8C22 8 24 12 24 12"/>
+            <path d="M12 8V20M16 6V22M20 8V20"/>
+          </svg>
+        </div>
+        SignAI
+      </a>
+      <div class="auth-glass-title">Create Account</div>
+      <div class="auth-glass-sub">Free forever — start your ASL journey today</div>
+    </div>
+
+    {% if error %}
+    <div class="auth-error-box" role="alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form id="reg-form" method="POST" action="{{ url_for('register') }}" novalidate>
+      <div class="form-group">
+        <div class="float-label-wrapper">
+          <input class="form-input" type="text" id="fullname" name="fullname"
+            placeholder=" " autocomplete="name" required
+            aria-label="Full name" aria-required="true"
+            value="{{ request.form.get('fullname', '') }}">
+          <label class="float-label" for="fullname">Full name</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="float-label-wrapper">
+          <div class="password-wrapper" style="position:relative">
+            <input class="form-input" type="email" id="email" name="email"
+              placeholder=" " autocomplete="email" required
+              aria-label="Email address" aria-required="true"
+              value="{{ request.form.get('email', '') }}">
+            <label class="float-label" for="email">Email address</label>
+            <svg class="email-icon valid"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg class="email-icon invalid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="float-label-wrapper">
+          <div class="password-wrapper">
+            <input class="form-input" type="password" id="password" name="password"
+              placeholder=" " autocomplete="new-password" required
+              aria-label="Password (minimum 8 characters)" aria-required="true" minlength="8">
+            <label class="float-label" for="password">Password (min 8 characters)</label>
+            <button type="button" class="password-toggle" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="strength-meter" aria-label="Password strength" style="margin-top:.4rem">
+          <div class="strength-bar" id="strength-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="strength-label" id="strength-label" aria-live="polite"
+          style="font-size:.73rem;margin-top:.2rem;color:rgba(210,190,255,.55)"></div>
+      </div>
+
+      <p style="font-size:.73rem;color:rgba(210,190,255,.4);margin-bottom:1rem;line-height:1.5">
+        By creating an account you agree to our terms of service and privacy policy.
+      </p>
+
+      <button type="submit" class="btn btn-primary" id="reg-btn"
+        style="width:100%;padding:.875rem;font-size:1rem;border-radius:12px;background:linear-gradient(135deg,#6c63ff,#8b5cf6);border:none;letter-spacing:.01em">
+        <span class="btn-spinner" aria-hidden="true"></span>
+        <span class="btn-text">Create Free Account</span>
+      </button>
+    </form>
+
+    <div class="auth-glass-switch">
+      Already have an account?
+      <a href="{{ url_for('login') }}">Sign in →</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const canvas = document.getElementById('authStarsCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const stars = Array.from({ length: 220 }, () => ({
+    x: Math.random(),
+    y: Math.random() * 0.78,
+    r: Math.random() * 1.4 + 0.2,
+    phase: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.008 + 0.003
+  }));
+
+  const sparkles = Array.from({ length: 18 }, () => ({
+    x: Math.random(),
+    y: Math.random() * 0.65,
+    size: Math.random() * 5 + 3,
+    phase: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.006 + 0.002
+  }));
+
+  function drawSparkle(x, y, size, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - size, y);
+    ctx.lineTo(x + size, y);
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x, y + size);
+    ctx.stroke();
+    ctx.globalAlpha = alpha * 0.4;
+    const d = size * 0.65;
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d);
+    ctx.lineTo(x + d, y + d);
+    ctx.moveTo(x + d, y - d);
+    ctx.lineTo(x - d, y + d);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height;
+    stars.forEach(s => {
+      s.phase += s.speed;
+      const alpha = (Math.sin(s.phase) + 1) / 2 * 0.85 + 0.1;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    sparkles.forEach(s => {
+      s.phase += s.speed;
+      const alpha = (Math.sin(s.phase) + 1) / 2;
+      drawSparkle(s.x * w, s.y * h, s.size, alpha);
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  const form    = document.getElementById('reg-form');
+  const btn     = document.getElementById('reg-btn');
+  const pwInput = document.getElementById('password');
+  const bar     = document.getElementById('strength-bar');
+  const lbl     = document.getElementById('strength-label');
+
+  if (pwInput && bar && lbl) {
+    pwInput.addEventListener('input', () => {
+      const v  = pwInput.value;
+      const sc = [v.length >= 8, /[A-Z]/.test(v), /[0-9]/.test(v), /[^A-Za-z0-9]/.test(v)].filter(Boolean).length;
+      const pct = sc * 25;
+      bar.style.width = pct + '%';
+      const colors = ['', '#ef4444', '#f59e0b', '#10b981', '#6c63ff'];
+      const labels = ['', 'Weak', 'Fair', 'Good', 'Strong ✓'];
+      bar.style.background = colors[sc] || 'rgba(255,255,255,0.1)';
+      lbl.textContent = sc > 0 ? labels[sc] : '';
+      bar.setAttribute('aria-valuenow', pct);
+    });
+  }
+
+  if (form && btn) {
+    form.addEventListener('submit', function(e) {
+      const name  = form.querySelector('#fullname').value.trim();
+      const email = form.querySelector('#email').value.trim();
+      const pass  = form.querySelector('#password').value;
+      const errors = [];
+      if (!name)  errors.push('Full name is required.');
+      if (!email || !email.includes('@')) errors.push('Valid email required.');
+      if (pass.length < 8) errors.push('Password must be at least 8 characters.');
+      if (errors.length) {
+        e.preventDefault();
+        if (window.SignAI) window.SignAI.Toast.error(errors.join(' '));
+        return;
+      }
+      if (window.SignAI) window.SignAI.setButtonLoading(btn, true);
+    });
+  }
+})();
+</script>
+{% endblock %}

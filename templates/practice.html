@@ -1,0 +1,423 @@
+{% extends "base_app.html" %}
+{% block title %}Practice Mode — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.practice-layout{display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start}
+@media(max-width:900px){.practice-layout{grid-template-columns:1fr}}
+.target-card{background:linear-gradient(135deg,var(--bg-card),rgba(108,99,255,.05));border:2px solid var(--border);border-radius:1.5rem;padding:2rem;text-align:center;position:relative;overflow:hidden;transition:border-color .3s}
+.target-card.correct{border-color:#10b981;background:rgba(16,185,129,.08)}
+.target-card.wrong{border-color:#ef4444;background:rgba(239,68,68,.05)}
+.target-letter{font-size:9rem;font-weight:900;line-height:1;transition:all .4s;user-select:none}
+.target-label{font-size:.8rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-secondary);margin-bottom:.5rem}
+.target-hint{font-size:.9rem;color:var(--text-secondary);margin-top:.75rem;min-height:1.4em}
+.score-bar{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.score-item{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1rem;padding:.6rem 1.25rem;text-align:center;min-width:80px}
+.score-item .val{font-size:1.75rem;font-weight:800;line-height:1}
+.score-item .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary)}
+.video-panel{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1.5rem;overflow:hidden;position:relative}
+.video-panel img{width:100%;display:block;background:#000;min-height:220px}
+.video-overlay-badge{position:absolute;top:.75rem;left:.75rem;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);border-radius:.5rem;padding:.3rem .7rem;font-size:.75rem;font-weight:600;color:#fff;display:flex;align-items:center;gap:.4rem}
+.vid-dot{width:8px;height:8px;border-radius:50%;background:#ef4444}
+.vid-dot.live{animation:pulse-dot 1s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.pred-overlay{position:absolute;bottom:.75rem;left:.75rem;right:.75rem;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);border-radius:.75rem;padding:.5rem .75rem;display:flex;justify-content:space-between;align-items:center;font-size:.85rem;color:#fff}
+.conf-meter{height:4px;border-radius:99px;background:rgba(255,255,255,.15);margin-top:.25rem;overflow:hidden}
+.conf-fill{height:100%;border-radius:99px;background:var(--accent-primary);transition:width .2s}
+.practice-controls{display:flex;flex-direction:column;gap:.75rem}
+.result-flash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:1.4rem;font-size:5rem;opacity:0;pointer-events:none;transition:opacity .3s}
+.result-flash.show{opacity:1}
+.letter-dots{display:flex;gap:.35rem;justify-content:center;flex-wrap:wrap;margin-top:.75rem}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--border)}
+.dot.correct{background:#10b981}
+.dot.wrong{background:#ef4444}
+.dot.current{background:var(--accent-primary);box-shadow:0 0 0 3px rgba(108,99,255,.3)}
+.match-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.1);margin:.75rem 0;overflow:hidden}
+.match-fill{height:100%;border-radius:99px;background:var(--accent-primary);transition:width .15s}
+.start-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1.5rem;gap:1.25rem;text-align:center}
+.mode-chip{padding:.45rem 1rem;border-radius:99px;border:1.5px solid var(--border);background:var(--bg-secondary);font-size:.8rem;cursor:pointer;transition:all .2s}
+.mode-chip.sel{border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(108,99,255,.1)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.75rem">
+      <div>
+        <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-secondary);margin-bottom:.25rem">Interactive</div>
+        <h1 style="margin:0">Practice Mode</h1>
+        <p style="margin:.25rem 0 0;color:var(--text-secondary)">Sign the letter shown — the AI scores you in real-time.</p>
+      </div>
+      <div id="game-status-badge" style="display:none">
+        <div class="badge" style="font-size:.9rem;padding:.5rem 1rem;background:rgba(16,185,129,.15);color:#10b981">
+          🎮 Round in progress
+        </div>
+      </div>
+    </div>
+
+    <!-- Scores -->
+    <div class="score-bar" id="score-bar">
+      <div class="score-item"><div class="val" id="sc-correct" style="color:#10b981">0</div><div class="lbl">Correct</div></div>
+      <div class="score-item"><div class="val" id="sc-wrong"   style="color:#ef4444">0</div><div class="lbl">Wrong</div></div>
+      <div class="score-item"><div class="val" id="sc-total">0</div><div class="lbl">Total</div></div>
+      <div class="score-item"><div class="val" id="sc-streak" style="color:#f59e0b">0</div><div class="lbl">Streak 🔥</div></div>
+      <div class="score-item"><div class="val" id="sc-pct" style="color:var(--accent-primary)">—</div><div class="lbl">Accuracy</div></div>
+    </div>
+
+    <!-- Layout -->
+    <div class="practice-layout">
+
+      <!-- LEFT: target + game -->
+      <div>
+        <!-- Start screen -->
+        <div id="start-screen" class="card start-screen">
+          <div style="font-size:5rem">🤟</div>
+          <h2 style="margin:0">Ready to Practice?</h2>
+          <p style="color:var(--text-secondary);max-width:340px">Position your hand in front of the webcam and sign the letter shown. The AI will score your attempt in real-time.</p>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:.5rem">
+            <div>
+              <div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.35rem">Round length</div>
+              <div style="display:flex;gap:.4rem">
+                <button class="mode-chip sel" data-len="5">5 letters</button>
+                <button class="mode-chip" data-len="10">10 letters</button>
+                <button class="mode-chip" data-len="26">Full A–Z</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btn-start" style="font-size:1rem;padding:.8rem 2rem">
+            Start Practice
+          </button>
+        </div>
+
+        <!-- Game screen -->
+        <div id="game-screen" style="display:none">
+          <div class="target-card" id="target-card">
+            <div class="result-flash" id="result-flash"></div>
+            <div class="target-label">Sign this letter</div>
+            <div class="target-letter" id="target-letter" style="color:var(--accent-primary)">A</div>
+            <div class="target-hint" id="target-hint">Make a fist with thumb on the side</div>
+            <div class="match-bar"><div class="match-fill" id="match-fill" style="width:0%"></div></div>
+            <div class="letter-dots" id="progress-dots"></div>
+          </div>
+          <div style="display:flex;gap:.75rem;margin-top:1rem;justify-content:center">
+            <button class="btn btn-secondary" id="btn-skip">Skip ›</button>
+            <button class="btn btn-secondary" id="btn-stop" style="color:#ef4444">Stop</button>
+          </div>
+        </div>
+
+        <!-- Results screen -->
+        <div id="results-screen" style="display:none">
+          <div class="card" style="text-align:center;padding:2.5rem">
+            <div style="font-size:4rem;margin-bottom:.75rem" id="results-emoji">🎉</div>
+            <h2 id="results-title" style="margin:0 0 .5rem">Round Complete!</h2>
+            <div style="font-size:3rem;font-weight:900;color:var(--accent-primary);margin:.75rem 0" id="results-score"></div>
+            <div style="color:var(--text-secondary);margin-bottom:1.5rem" id="results-subtitle"></div>
+            <div class="letter-dots" id="results-dots" style="justify-content:center;margin-bottom:1.5rem"></div>
+            <div style="display:flex;gap:.75rem;justify-content:center">
+              <button class="btn btn-primary" id="btn-play-again">Play Again</button>
+              <a class="btn btn-secondary" href="{{ url_for('dictionary') }}">Review Dictionary</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: camera -->
+      <div class="practice-controls">
+        <div class="video-panel" id="video-panel">
+          <img id="video-feed" src="" alt="Camera feed" style="display:none;object-fit:cover">
+          <div id="no-camera" style="padding:3rem 1rem;text-align:center;color:var(--text-secondary)">
+            <div style="font-size:3rem;margin-bottom:.75rem">📸</div>
+            <div>Camera opens automatically when practice starts</div>
+          </div>
+          <div class="video-overlay-badge" id="live-badge" style="display:none">
+            <span class="vid-dot live"></span> Live
+          </div>
+          <div class="pred-overlay" id="pred-overlay" style="display:none">
+            <div>
+              <div style="font-weight:600" id="pred-letter">—</div>
+              <div style="font-size:.7rem;color:rgba(255,255,255,.6)">Detected</div>
+            </div>
+            <div style="text-align:right;min-width:60px">
+              <div id="pred-conf">—</div>
+              <div class="conf-meter"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tips card -->
+        <div class="card" id="tips-card">
+          <div class="card-header"><h3 class="card-title">Tips</h3></div>
+          <ul style="margin:0;padding-left:1.25rem;color:var(--text-secondary);font-size:.875rem;line-height:2">
+            <li>Keep your hand in clear view</li>
+            <li>Good lighting helps accuracy</li>
+            <li>Hold the sign steady for 1s</li>
+            <li>Palm should face the camera</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { Toast, apiFetch, setButtonLoading } = window.SignAI;
+
+  /* ── ASL Hints ─────────────────────────────────────────────────── */
+  const HINTS = {
+    A:'Fist, thumb on side',B:'Flat hand, thumb tucked',C:'Curved C shape',
+    D:'Index up, circle with thumb',E:'Fingers bent to thumb',F:'OK sign, 3 fingers up',
+    G:'Index & thumb horizontal',H:'Index & middle sideways',I:'Pinky up',
+    J:'Pinky up, trace J',K:'Index up, middle angled',L:'L-shape: index up, thumb out',
+    M:'3 fingers over thumb',N:'2 fingers over thumb',O:'All fingers meet thumb',
+    P:'K shape pointing down',Q:'G shape pointing down',R:'Index & middle crossed',
+    S:'Fist, thumb over fingers',T:'Thumb between index & middle',
+    U:'Index & middle together up',V:'Peace sign spread wide',W:'3 fingers spread',
+    X:'Index finger hooked',Y:'Pinky & thumb out',Z:'Index traces Z in air',
+  };
+
+  /* ── State ─────────────────────────────────────────────────────── */
+  let _isRunning    = false;
+  let _gameActive   = false;
+  let _letters      = [];
+  let _idx          = 0;
+  let _correct      = 0;
+  let _wrong        = 0;
+  let _streak       = 0;
+  let _maxStreak    = 0;
+  let _results      = [];
+  let _matchFrames  = 0;
+  let _required     = 4;      // consecutive matching frames to confirm
+  let _roundLen     = 5;
+
+  /* ── DOM ───────────────────────────────────────────────────────── */
+  const videoFeed   = document.getElementById('video-feed');
+  const liveBadge   = document.getElementById('live-badge');
+  const predOverlay = document.getElementById('pred-overlay');
+  const predLetter  = document.getElementById('pred-letter');
+  const predConf    = document.getElementById('pred-conf');
+  const confFill    = document.getElementById('conf-fill');
+  const matchFill   = document.getElementById('match-fill');
+  const targetCard  = document.getElementById('target-card');
+  const targetLetter= document.getElementById('target-letter');
+  const targetHint  = document.getElementById('target-hint');
+  const flash       = document.getElementById('result-flash');
+  const progressDots= document.getElementById('progress-dots');
+
+  /* ── Round length select ───────────────────────────────────────── */
+  document.querySelectorAll('[data-len]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-len]').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      _roundLen = parseInt(btn.dataset.len);
+    });
+  });
+
+  /* ── Start / Stop ──────────────────────────────────────────────── */
+  document.getElementById('btn-start').addEventListener('click', startGame);
+  document.getElementById('btn-stop').addEventListener('click', endGame);
+  document.getElementById('btn-skip').addEventListener('click', skipLetter);
+  document.getElementById('btn-play-again').addEventListener('click', () => {
+    show('start-screen');
+    hide('results-screen');
+  });
+
+  async function startCamera() {
+    const res = await apiFetch('/api/camera/open', { method: 'POST' });
+    if (!res.data.success) throw new Error(res.data.error || 'Camera failed');
+    videoFeed.src = '/video_feed';
+    videoFeed.style.display = 'block';
+    document.getElementById('no-camera').style.display = 'none';
+    liveBadge.style.display = 'flex';
+    predOverlay.style.display = 'flex';
+    document.getElementById('game-status-badge').style.display = 'block';
+  }
+
+  async function stopCamera() {
+    _isRunning = false;
+    videoFeed.src = '';
+    videoFeed.style.display = 'none';
+    document.getElementById('no-camera').style.display = '';
+    liveBadge.style.display = 'none';
+    predOverlay.style.display = 'none';
+    document.getElementById('game-status-badge').style.display = 'none';
+    await apiFetch('/api/camera/close', { method: 'POST' }).catch(() => {});
+  }
+
+  async function startGame() {
+    try {
+      setButtonLoading(document.getElementById('btn-start'), true);
+      await startCamera();
+    } catch(e) {
+      Toast.error('Could not open camera: ' + e.message);
+      setButtonLoading(document.getElementById('btn-start'), false);
+      return;
+    }
+
+    _correct = _wrong = _streak = _maxStreak = _idx = _matchFrames = 0;
+    _results = [];
+    _gameActive = true;
+    _isRunning  = true;
+
+    const all = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    if (_roundLen === 26) {
+      _letters = shuffle(all);
+    } else {
+      _letters = [];
+      while (_letters.length < _roundLen) _letters.push(...shuffle(all));
+      _letters = _letters.slice(0, _roundLen);
+    }
+
+    updateScores();
+    renderDots();
+    showLetter();
+    hide('start-screen');
+    show('game-screen');
+    setButtonLoading(document.getElementById('btn-start'), false);
+    runPredLoop();
+  }
+
+  function endGame() {
+    _gameActive = false;
+    stopCamera();
+    hide('game-screen');
+    showResults();
+  }
+
+  /* ── Game Logic ────────────────────────────────────────────────── */
+  function showLetter() {
+    const letter = _letters[_idx];
+    targetLetter.textContent = letter;
+    targetLetter.style.color = 'var(--accent-primary)';
+    targetHint.textContent   = HINTS[letter] || '';
+    targetCard.classList.remove('correct', 'wrong');
+    matchFill.style.width = '0%';
+    _matchFrames = 0;
+  }
+
+  function confirmCorrect() {
+    _correct++;
+    _streak++;
+    _maxStreak = Math.max(_maxStreak, _streak);
+    _results.push('correct');
+    showFlash('✅', 'correct');
+    updateScores();
+    renderDots();
+    setTimeout(nextLetter, 800);
+  }
+
+  function skipLetter() {
+    _wrong++;
+    _streak = 0;
+    _results.push('wrong');
+    showFlash('⏭️', 'wrong');
+    updateScores();
+    renderDots();
+    setTimeout(nextLetter, 600);
+  }
+
+  function nextLetter() {
+    _idx++;
+    _matchFrames = 0;
+    if (_idx >= _letters.length) {
+      endGame();
+    } else {
+      targetCard.classList.remove('correct','wrong');
+      showLetter();
+    }
+  }
+
+  function showFlash(emoji, cls) {
+    flash.textContent = emoji;
+    flash.classList.add('show');
+    targetCard.classList.add(cls);
+    setTimeout(() => flash.classList.remove('show'), 700);
+  }
+
+  function updateScores() {
+    const total = _correct + _wrong;
+    document.getElementById('sc-correct').textContent = _correct;
+    document.getElementById('sc-wrong').textContent   = _wrong;
+    document.getElementById('sc-total').textContent   = total;
+    document.getElementById('sc-streak').textContent  = _streak;
+    document.getElementById('sc-pct').textContent     = total ? Math.round(_correct/total*100)+'%' : '—';
+  }
+
+  function renderDots() {
+    progressDots.innerHTML = _letters.map((_, i) => {
+      const r = _results[i];
+      const cls = r === 'correct' ? 'correct' : r === 'wrong' ? 'wrong' : (i === _idx ? 'current' : '');
+      return `<div class="dot ${cls}" title="Letter ${_letters[i]}"></div>`;
+    }).join('');
+  }
+
+  function showResults() {
+    const total = _correct + _wrong;
+    const pct   = total ? Math.round(_correct/total*100) : 0;
+    document.getElementById('results-score').textContent    = `${_correct}/${total}`;
+    document.getElementById('results-subtitle').textContent = `Accuracy: ${pct}% · Best streak: ${_maxStreak}`;
+    document.getElementById('results-emoji').textContent    = pct >= 90 ? '🏆' : pct >= 70 ? '🎉' : pct >= 50 ? '👍' : '💪';
+    document.getElementById('results-title').textContent    = pct >= 90 ? 'Outstanding!' : pct >= 70 ? 'Great Job!' : pct >= 50 ? 'Good Effort!' : 'Keep Practicing!';
+    document.getElementById('results-dots').innerHTML = _results.map((r,i) =>
+      `<div class="dot ${r}" title="${_letters[i]}: ${r}"></div>`).join('');
+    show('results-screen');
+  }
+
+  /* ── Prediction Loop ───────────────────────────────────────────── */
+  async function runPredLoop() {
+    while (_isRunning) {
+      const t0 = performance.now();
+      try {
+        if (_gameActive) {
+          const res = await apiFetch('/api/predict/frame', {
+            method: 'POST',
+            body: JSON.stringify({ auto_save: false }),
+          });
+          if (res.data.success) processPrediction(res.data.data);
+        } else {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch {}
+      const wait = Math.max(0, 100 - (performance.now() - t0));
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+
+  function processPrediction(d) {
+    const conf   = d.confidence || 0;
+    const letter = d.letter     || '—';
+
+    /* Update HUD */
+    predLetter.textContent   = d.hand_detected ? letter : '—';
+    predConf.textContent     = d.hand_detected ? conf.toFixed(1)+'%' : 'No hand';
+    confFill.style.width     = conf + '%';
+    confFill.style.background= conf >= 80 ? '#10b981' : conf >= 50 ? 'var(--accent-primary)' : '#f59e0b';
+
+    if (!_gameActive || _idx >= _letters.length) return;
+    const target = _letters[_idx];
+
+    if (d.hand_detected && letter === target && conf >= 70) {
+      _matchFrames++;
+      matchFill.style.width = (_matchFrames / _required * 100) + '%';
+      if (_matchFrames >= _required) confirmCorrect();
+    } else {
+      _matchFrames = Math.max(0, _matchFrames - 1);
+      matchFill.style.width = (_matchFrames / _required * 100) + '%';
+    }
+  }
+
+  /* ── Helpers ───────────────────────────────────────────────────── */
+  function show(id) { document.getElementById(id).style.display = ''; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+  function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
+
+  window.addEventListener('beforeunload', () => { _isRunning = false; apiFetch('/api/camera/close',{method:'POST'}).catch(()=>{}); });
+});
+</script>
+{% endblock %}

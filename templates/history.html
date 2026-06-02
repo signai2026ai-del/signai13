@@ -1,0 +1,296 @@
+{% extends "base_app.html" %}
+{% block title %}History — SignAI{% endblock %}
+{% block content %}
+
+<div style="padding:2rem 1.5rem">
+  <div class="container">
+    <div class="page-header" style="padding:0;border:none;margin-bottom:1.5rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+        <div>
+          <h1>Prediction History</h1>
+          <p style="margin:0;color:var(--text-secondary)">Browse and manage all your recognition sessions.</p>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="btn-export">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button class="btn btn-danger btn-sm" id="btn-delete-selected" style="display:none">
+            Delete Selected (<span id="selected-count">0</span>)
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btn-clear-all" data-modal-open="confirm-clear-modal">
+            Clear All
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:1.5rem;padding:1rem">
+      <div style="display:grid;grid-template-columns:1fr 160px 1fr;gap:1rem;align-items:end" class="filters-row">
+        <div>
+          <label class="form-label" for="filter-letter">Filter by Letter</label>
+          <select class="form-input" id="filter-letter" aria-label="Filter by letter">
+            <option value="">All Letters</option>
+            {% for l in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Min Confidence: <span id="conf-min-label">0%</span></label>
+          <input type="range" class="range-slider" id="filter-conf-min" min="0" max="100" value="0" aria-label="Minimum confidence filter">
+        </div>
+        <div>
+          <label class="form-label">Max Confidence: <span id="conf-max-label">100%</span></label>
+          <input type="range" class="range-slider" id="filter-conf-max" min="0" max="100" value="100" aria-label="Maximum confidence filter">
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrapper">
+        <table id="history-table" aria-label="Prediction history">
+          <thead>
+            <tr>
+              <th style="width:40px">
+                <input type="checkbox" id="select-all" aria-label="Select all">
+              </th>
+              <th data-col="letter" class="sortable">Letter <span class="sort-icon" aria-hidden="true">↕</span></th>
+              <th data-col="confidence" class="sortable">Confidence <span class="sort-icon" aria-hidden="true">↕</span></th>
+              <th>Top 5</th>
+              <th data-col="created_at" class="sortable">Time <span class="sort-icon" aria-hidden="true">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td colspan="5" style="text-align:center;padding:3rem;color:var(--text-secondary)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Sentinel for infinite scroll -->
+      <div id="scroll-sentinel" style="height:4px"></div>
+    </div>
+
+    <!-- Pagination info -->
+    <div style="display:flex;justify-content:center;margin-top:1rem">
+      <span id="pagination-info" style="color:var(--text-secondary);font-size:0.875rem"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Clear Modal -->
+<div class="modal-overlay" id="confirm-clear-modal" role="dialog" aria-modal="true" aria-labelledby="clear-modal-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="clear-modal-title">Clear All History?</h3>
+      <button class="modal-close" data-modal-close="confirm-clear-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p style="color:var(--text-secondary)">This will permanently delete all your prediction records. This action cannot be undone.</p>
+    <div style="display:flex;gap:1rem;margin-top:1.5rem;justify-content:flex-end">
+      <button class="btn btn-ghost" data-modal-close="confirm-clear-modal">Cancel</button>
+      <button class="btn btn-danger" id="confirm-clear-btn">Delete All</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { apiFetch, Toast, Modal } = window.SignAI;
+
+  let _allRows    = [];
+  let _filtered   = [];
+  let _sortCol    = 'created_at';
+  let _sortDir    = 'desc';
+  let _page       = 1;
+  let _loading    = false;
+  let _hasMore    = true;
+  let _selected   = new Set();
+  let _filterLetter = '';
+  let _filterMin  = 0;
+  let _filterMax  = 100;
+
+  const tbody     = document.getElementById('history-body');
+  const paginInfo = document.getElementById('pagination-info');
+  const selCount  = document.getElementById('selected-count');
+  const delBtn    = document.getElementById('btn-delete-selected');
+
+  async function loadPage(page = 1) {
+    if (_loading) return;
+    _loading = true;
+    try {
+      const res = await apiFetch(`/api/history?page=${page}&per_page=20`);
+      if (!res.data.success) throw new Error(res.data.error);
+      const { rows, total, pages } = res.data.data;
+      _hasMore = page < pages;
+      if (page === 1) { _allRows = rows; }
+      else            { _allRows = _allRows.concat(rows); }
+      _page = page;
+      paginInfo.textContent = `Showing ${_allRows.length} of ${total} predictions`;
+      applyFilters();
+    } catch (err) {
+      Toast.error('Failed to load history: ' + err.message);
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--accent-danger);padding:2rem">${err.message}</td></tr>`;
+    } finally {
+      _loading = false;
+    }
+  }
+
+  function applyFilters() {
+    _filtered = _allRows.filter(r => {
+      if (_filterLetter && r.letter !== _filterLetter) return false;
+      const c = Math.round(r.confidence);
+      if (c < _filterMin || c > _filterMax) return false;
+      return true;
+    });
+    sortAndRender();
+  }
+
+  function sortAndRender() {
+    const col = _sortCol;
+    const dir = _sortDir === 'asc' ? 1 : -1;
+    _filtered.sort((a, b) => {
+      let av = a[col], bv = b[col];
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+    renderRows();
+  }
+
+  function renderRows() {
+    if (!_filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:3rem;color:var(--text-secondary)">No predictions match your filters.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = _filtered.map(r => {
+      const conf = Math.round(r.confidence);
+      const cls  = conf >= 70 ? 'conf-high' : conf >= 40 ? 'conf-medium' : 'conf-low';
+      const t    = new Date(r.created_at).toLocaleString();
+      let top5html = '';
+      try {
+        const t5 = JSON.parse(r.top5_json || '[]');
+        top5html = t5.slice(0, 3).map(x => `<span class="badge badge-grey">${x.letter} ${x.confidence.toFixed(0)}%</span>`).join(' ');
+      } catch (e) {}
+      return `
+        <tr data-id="${r.id}">
+          <td><input type="checkbox" class="row-select" data-id="${r.id}" aria-label="Select row ${r.id}" ${_selected.has(r.id) ? 'checked' : ''}></td>
+          <td><span class="letter-badge ${cls}" aria-label="Letter ${r.letter}">${r.letter}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.75rem">
+              <div class="progress" style="width:80px"><div class="progress-bar" style="width:${conf}%"></div></div>
+              <span style="font-size:0.8rem;color:var(--text-secondary)">${conf}%</span>
+            </div>
+          </td>
+          <td>${top5html}</td>
+          <td style="color:var(--text-secondary);font-size:0.8rem">${t}</td>
+        </tr>`;
+    }).join('');
+
+    // Re-attach checkbox listeners
+    tbody.querySelectorAll('.row-select').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = parseInt(cb.dataset.id);
+        if (cb.checked) _selected.add(id);
+        else            _selected.delete(id);
+        updateSelectionUI();
+      });
+    });
+  }
+
+  function updateSelectionUI() {
+    selCount.textContent = _selected.size;
+    delBtn.style.display = _selected.size > 0 ? 'inline-flex' : 'none';
+  }
+
+  // Select all
+  document.getElementById('select-all').addEventListener('change', function() {
+    _filtered.forEach(r => { if (this.checked) _selected.add(r.id); else _selected.delete(r.id); });
+    tbody.querySelectorAll('.row-select').forEach(cb => cb.checked = this.checked);
+    updateSelectionUI();
+  });
+
+  // Sorting
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (_sortCol === col) _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+      else { _sortCol = col; _sortDir = 'desc'; }
+      document.querySelectorAll('th.sortable').forEach(t => t.classList.remove('sorted-asc','sorted-desc'));
+      th.classList.add(_sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+      sortAndRender();
+    });
+  });
+
+  // Filters
+  document.getElementById('filter-letter').addEventListener('change', function() {
+    _filterLetter = this.value; applyFilters();
+  });
+  document.getElementById('filter-conf-min').addEventListener('input', function() {
+    _filterMin = parseInt(this.value);
+    document.getElementById('conf-min-label').textContent = _filterMin + '%';
+    applyFilters();
+  });
+  document.getElementById('filter-conf-max').addEventListener('input', function() {
+    _filterMax = parseInt(this.value);
+    document.getElementById('conf-max-label').textContent = _filterMax + '%';
+    applyFilters();
+  });
+
+  // Infinite scroll
+  const sentinel = document.getElementById('scroll-sentinel');
+  const io = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting && !_loading && _hasMore) {
+      loadPage(_page + 1);
+    }
+  });
+  io.observe(sentinel);
+
+  // Delete selected
+  delBtn.addEventListener('click', async () => {
+    if (!_selected.size) return;
+    const ids = Array.from(_selected);
+    try {
+      const res = await apiFetch('/api/history/delete', { method: 'DELETE', body: JSON.stringify({ ids }) });
+      if (!res.data.success) throw new Error(res.data.error);
+      Toast.success(`Deleted ${ids.length} predictions.`);
+      _selected.clear();
+      updateSelectionUI();
+      _page = 1; _hasMore = true;
+      await loadPage(1);
+    } catch (err) { Toast.error('Delete failed: ' + err.message); }
+  });
+
+  // Clear all
+  document.getElementById('confirm-clear-btn').addEventListener('click', async () => {
+    try {
+      const res = await apiFetch('/api/history/clear', { method: 'DELETE' });
+      if (!res.data.success) throw new Error(res.data.error);
+      Modal.close('confirm-clear-modal');
+      Toast.success('History cleared.');
+      _allRows = []; _filtered = []; renderRows();
+      paginInfo.textContent = 'Showing 0 of 0 predictions';
+    } catch (err) { Toast.error(err.message); }
+  });
+
+  // CSV Export
+  document.getElementById('btn-export').addEventListener('click', () => {
+    if (!_filtered.length) { Toast.warning('Nothing to export.'); return; }
+    const headers = ['id','letter','confidence','created_at'];
+    const rows    = [headers, ..._filtered.map(r => [r.id, r.letter, r.confidence.toFixed(2), r.created_at])];
+    const csv     = rows.map(r => r.join(',')).join('\n');
+    const blob    = new Blob([csv], { type: 'text/csv' });
+    const a       = document.createElement('a');
+    a.href        = URL.createObjectURL(blob);
+    a.download    = 'signai-history.csv';
+    a.click();
+    Toast.success('CSV exported!');
+  });
+
+  loadPage(1);
+});
+</script>
+{% endblock %}

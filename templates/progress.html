@@ -1,0 +1,209 @@
+{% extends "base_app.html" %}
+{% block title %}My Progress — SignAI{% endblock %}
+
+{% block head_extra %}
+<style>
+.prog-hero{background:linear-gradient(135deg,rgba(0,212,170,.12),rgba(108,99,255,.06));border:1px solid rgba(0,212,170,.2);border-radius:1.5rem;padding:2rem;margin-bottom:2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;position:relative;overflow:hidden}
+.prog-hero::after{content:'📊';position:absolute;right:2rem;font-size:6rem;opacity:.1;pointer-events:none}
+.stat-big{font-size:2.5rem;font-weight:900;line-height:1}
+.alphabet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:.6rem}
+.alpha-cell{background:var(--bg-card);border:1.5px solid var(--border);border-radius:1rem;padding:.6rem;text-align:center;transition:all .25s;cursor:default;position:relative;overflow:hidden}
+.alpha-cell::before{content:'';position:absolute;bottom:0;left:0;right:0;height:4px;border-radius:0 0 .6rem .6rem;background:var(--accent-primary);transform:scaleX(0);transition:transform .4s cubic-bezier(.4,0,.2,1);transform-origin:left}
+.alpha-cell.has-data::before{transform:scaleX(var(--progress))}
+.alpha-cell:hover{border-color:var(--accent-primary);transform:scale(1.05)}
+.alpha-cell .alph{font-size:1.5rem;font-weight:900;line-height:1;margin-bottom:.15rem}
+.alpha-cell .cnt{font-size:.65rem;color:var(--text-secondary);font-weight:600}
+.alpha-cell.not-yet{opacity:.5}
+.alpha-cell.mastered{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.06)}
+.alpha-cell.practiced{border-color:rgba(108,99,255,.3);background:rgba(108,99,255,.04)}
+.bar-list{display:flex;flex-direction:column;gap:.6rem}
+.bar-row{display:flex;align-items:center;gap:.75rem}
+.bar-letter{width:28px;font-weight:700;font-size:1.1rem;flex-shrink:0;text-align:center}
+.bar-track{flex:1;height:10px;background:var(--border);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;background:var(--accent-primary);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-count{width:48px;text-align:right;font-size:.8rem;color:var(--text-secondary);flex-shrink:0}
+.legend{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.8rem}
+.legend-item{display:flex;align-items:center;gap:.4rem;color:var(--text-secondary)}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.tab-bar{display:flex;gap:.5rem;margin-bottom:1.5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem}
+.tab{padding:.5rem 1rem;border-radius:.5rem .5rem 0 0;border:none;background:none;color:var(--text-secondary);font-size:.9rem;cursor:pointer;font-weight:500;transition:all .2s;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--accent-primary);border-bottom-color:var(--accent-primary);background:rgba(108,99,255,.06)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:2rem 1.5rem">
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="prog-hero">
+      <div>
+        <div style="font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-secondary);margin-bottom:.5rem">Learning Progress</div>
+        <h1 style="margin:0 0 .5rem">My Progress</h1>
+        <p style="margin:0;color:var(--text-secondary)">Track which letters you've practiced and how often.</p>
+      </div>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div class="stat-big" id="total-preds" style="color:var(--accent-primary)">—</div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">Total Predictions</div>
+        </div>
+        <div style="text-align:center">
+          <div class="stat-big" id="letters-prac" style="color:var(--accent-secondary)">—</div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">Letters Practiced</div>
+        </div>
+        <div style="text-align:center">
+          <div class="stat-big" id="letters-left" style="color:var(--accent-warning)">—</div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">Left to Try</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Master progress bar -->
+    <div class="card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+        <div style="font-weight:700">Alphabet Coverage</div>
+        <div style="font-size:.85rem;color:var(--text-secondary)" id="coverage-label">0 / 26 letters</div>
+      </div>
+      <div style="height:12px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div id="coverage-bar" style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent-primary),var(--accent-secondary));transition:width .8s cubic-bezier(.4,0,.2,1);width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar" role="tablist">
+      <button class="tab active" data-tab="grid" role="tab" aria-selected="true">Grid View</button>
+      <button class="tab" data-tab="bars" role="tab" aria-selected="false">Bar Chart</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,.6)"></div> Mastered (10+)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(108,99,255,.5)"></div> Practiced</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--border)"></div> Not yet tried</div>
+    </div>
+
+    <!-- Grid View -->
+    <div id="tab-grid">
+      <div class="alphabet-grid" id="alpha-grid">
+        <!-- Skeleton -->
+        {% for l in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        <div class="alpha-cell not-yet">
+          <div class="alph">{{ l }}</div>
+          <div class="cnt">—</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Bar Chart View -->
+    <div id="tab-bars" style="display:none">
+      <div class="card" style="padding:1.5rem">
+        <div class="bar-list" id="bar-list">
+          <!-- Filled by JS -->
+          <div style="color:var(--text-secondary);text-align:center;padding:2rem">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggestion -->
+    <div id="suggestion-card" class="card" style="margin-top:1.5rem;display:none;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06);padding:1.25rem 1.5rem">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <div style="font-size:1.5rem">💡</div>
+        <div>
+          <div style="font-weight:700;margin-bottom:.2rem">Practice Suggestion</div>
+          <div style="font-size:.875rem;color:var(--text-secondary)" id="suggestion-text"></div>
+        </div>
+        <a id="suggestion-link" href="{{ url_for('practice') }}" class="btn btn-secondary btn-sm" style="margin-left:auto">Practice Now →</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const { apiFetch, Toast } = window.SignAI;
+  let _data = null;
+
+  async function loadProgress() {
+    try {
+      const res = await apiFetch('/api/progress');
+      if (!res.data.success) throw new Error(res.data.error);
+      _data = res.data.data;
+      render();
+    } catch(err) {
+      Toast.error('Failed to load progress: ' + err.message);
+    }
+  }
+
+  function render() {
+    const { letters, total, practiced_count, remaining_count } = _data;
+
+    /* Hero stats */
+    document.getElementById('total-preds').textContent   = total.toLocaleString();
+    document.getElementById('letters-prac').textContent  = practiced_count;
+    document.getElementById('letters-left').textContent  = remaining_count;
+
+    /* Coverage bar */
+    const covPct = Math.round(practiced_count / 26 * 100);
+    document.getElementById('coverage-bar').style.width   = covPct + '%';
+    document.getElementById('coverage-label').textContent = `${practiced_count} / 26 letters (${covPct}%)`;
+
+    /* Grid */
+    const maxCount = Math.max(...letters.map(l => l.count), 1);
+    document.getElementById('alpha-grid').innerHTML = letters.map(l => {
+      const mastered  = l.count >= 10;
+      const practiced = l.count > 0 && !mastered;
+      const cls = mastered ? 'mastered' : practiced ? 'practiced' : 'not-yet';
+      const prog = (l.count / maxCount).toFixed(3);
+      return `
+        <div class="alpha-cell ${cls} has-data" style="--progress:${prog}"
+             title="${l.letter}: ${l.count} predictions (${l.rel_pct}% of total)"
+             role="img" aria-label="Letter ${l.letter}: ${l.count} predictions">
+          <div class="alph">${l.letter}</div>
+          <div class="cnt">${l.count > 999 ? (l.count/1000).toFixed(1)+'k' : l.count}</div>
+        </div>`;
+    }).join('');
+
+    /* Bar chart */
+    const sorted = [...letters].sort((a,b) => b.count - a.count);
+    document.getElementById('bar-list').innerHTML = sorted.map(l => {
+      const pct = maxCount ? Math.round(l.count / maxCount * 100) : 0;
+      const col = l.count >= 10 ? '#10b981' : l.count > 0 ? 'var(--accent-primary)' : 'var(--border)';
+      return `
+        <div class="bar-row" title="${l.count} predictions">
+          <div class="bar-letter" style="color:${col}">${l.letter}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%;background:${col}"></div>
+          </div>
+          <div class="bar-count">${l.count}</div>
+        </div>`;
+    }).join('');
+
+    /* Suggestion */
+    const notYet = letters.filter(l => !l.practiced).map(l => l.letter);
+    if (notYet.length > 0) {
+      const pick = notYet.slice(0,3).join(', ');
+      document.getElementById('suggestion-card').style.display = 'flex';
+      document.getElementById('suggestion-text').textContent =
+        `You haven't practiced: ${pick}${notYet.length > 3 ? ' and '+(notYet.length-3)+' more' : ''}. Head to Practice Mode to try them!`;
+    }
+  }
+
+  /* Tabs */
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected','true');
+      document.getElementById('tab-grid').style.display = tab.dataset.tab === 'grid' ? '' : 'none';
+      document.getElementById('tab-bars').style.display = tab.dataset.tab === 'bars' ? '' : 'none';
+    });
+  });
+
+  loadProgress();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+{
+  "model_type": "landmark_dnn",
+  "input_shape": [
+    null,
+    63
+  ],
+  "labels": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z"
+  ],
+  "trained_at": "2026-03-24T23:30:31",
+  "accuracy": null
+}

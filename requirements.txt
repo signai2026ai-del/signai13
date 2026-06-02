@@ -1,0 +1,38 @@
+# ============================================================
+# SignAI — Python Requirements
+# Python 3.10 or 3.11 recommended
+# Install with:  pip install -r requirements.txt
+# ============================================================
+
+# ── Web Framework ──────────────────────────────────────────
+Flask==3.0.0
+Werkzeug==3.0.1
+Flask-Cors==4.0.0
+Flask-Limiter==3.5.0
+python-dotenv==1.0.0
+
+# ── Database ───────────────────────────────────────────────
+PyMySQL==1.1.0
+cryptography==42.0.5
+
+# ── AI / Machine Learning ──────────────────────────────────
+tensorflow==2.15.0
+numpy==1.26.4
+scikit-learn==1.4.0
+h5py==3.10.0
+
+# ── Computer Vision ────────────────────────────────────────
+# IMPORTANT: use opencv-python (NOT opencv-python-headless) on Windows
+opencv-python==4.9.0.80
+mediapipe==0.10.9
+Pillow==10.2.0
+
+# ── Text-to-Speech ─────────────────────────────────────────
+gtts==2.5.1
+pyttsx3==2.90
+# pyttsx3 requires pywin32 on Windows (for SAPI5 voice engine)
+pywin32==306 ; sys_platform == "win32"
+
+# ── Production Server ──────────────────────────────────────
+# gunicorn does NOT work on Windows — remove the # only on Linux/Mac
+# gunicorn==21.2.0
