@@ -14,11 +14,9 @@ class BaseConfig:
     SESSION_COOKIE_SAMESITE = "Lax"
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024)))
 
-    DB_USER = os.environ.get("DB_USER", "root")
-    DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
-    DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
-    DB_PORT = int(os.environ.get("DB_PORT", "8889"))
-    DB_NAME = os.environ.get("DB_NAME", "signai")
+    # ── SQLite Database Configuration ──────────────────────────────
+    # اسم ملف قاعدة البيانات (سيتم إنشاؤه تلقائياً)
+    DB_PATH = os.environ.get("DB_PATH", "site.db")
 
     MODEL_PATH = os.environ.get("MODEL_PATH", "models/sign_language_model.h5")
     CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.70"))
@@ -46,6 +44,7 @@ class ProductionConfig(BaseConfig):
                 "ProductionConfig requires SECRET_KEY to be set via environment variable "
                 "to a strong random value. Never use the default dev key in production."
             )
+
 class TestingConfig(BaseConfig):
     DEBUG = True
     TESTING = True
