@@ -16,7 +16,7 @@ PyMySQL==1.1.0
 cryptography==42.0.5
 
 # ── AI / Machine Learning ──────────────────────────────────
-tensorflow==2.15.0
+tensorflow-cpu==2.15.0
 numpy==1.26.4
 scikit-learn==1.4.0
 h5py==3.10.0
