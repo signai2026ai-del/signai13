@@ -1,17 +1,19 @@
+
 import base64
 import io
 import json
 import logging
 import os
+import sys
 import threading
 import time
 import traceback
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from functools import wraps
 
+# Load environment variables first
 from dotenv import load_dotenv
-
 load_dotenv(override=True)
 
 from flask import (
@@ -23,10 +25,14 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# Import local modules
+# Make sure these files exist in your project directory
 import cnn_model
 import db_manager
 from config import get_config
 from preprocess import decode_base64_image, preprocess_crop, preprocess_frame
+
+# ─── CONFIGURATION & LOGGING ──────────────────────────────────────────────────
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,25 +44,35 @@ cfg = get_config()
 
 app = Flask(__name__)
 app.config.from_object(cfg)
+app.secret_key = cfg.SECRET_KEY  # Ensure SECRET_KEY is defined in config
 
 CORS(app, supports_credentials=True)
 
+# Setup Rate Limiter
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=cfg.RATELIMIT_STORAGE_URI,
+    storage_uri=cfg.RATELIMIT_STORAGE_URI, # usually "memory://" for local/small deploy
 )
+
+# ─── INITIALIZATION ───────────────────────────────────────────────────────────
 
 db_manager.init_db_config(cfg)
 _db_ok = db_manager.init_db()
 if not _db_ok:
     logger.warning("Database initialization failed. Running without persistence.")
 
-cnn_model.load_model(cfg.MODEL_PATH)
+try:
+    cnn_model.load_model(cfg.MODEL_PATH)
+    logger.info("Model loaded successfully from %s", cfg.MODEL_PATH)
+except Exception as e:
+    logger.error("Failed to load model: %s", e)
+    # Depending on your needs, you might want to exit here or run in demo mode
+
+# ─── GLOBAL STATE MANAGEMENT ──────────────────────────────────────────────────
 
 # Per-user PredictionBuffer instances keyed by session ID
-# TTL-based cleanup: buffers unused for more than BUFFER_TTL_SECONDS are evicted
 _pred_buffers: dict[str, cnn_model.PredictionBuffer] = {}
 _buffer_last_access: dict[str, float] = {}
 _buffers_lock = threading.Lock()
@@ -64,6 +80,7 @@ BUFFER_TTL_SECONDS = 3600  # evict buffers idle for more than 1 hour
 
 
 def _get_buffer(session_id: str) -> cnn_model.PredictionBuffer:
+    """Retrieves or creates a prediction buffer for the session."""
     now = time.time()
     with _buffers_lock:
         # Evict stale buffers to prevent unbounded memory growth
@@ -78,10 +95,14 @@ def _get_buffer(session_id: str) -> cnn_model.PredictionBuffer:
         _buffer_last_access[session_id] = now
         return _pred_buffers[session_id]
 
-
 # ─── CAMERA MANAGER ──────────────────────────────────────────────────────────
 
 class CameraManager:
+    """
+    Manages the camera connection. 
+    Note: This will generally NOT work on cloud servers like Render/Heroku 
+    because they do not have physical webcams. This is kept for local/RPi usage.
+    """
     def __init__(self):
         self._cap = None
         self._lock = threading.Lock()
@@ -93,36 +114,45 @@ class CameraManager:
         with self._lock:
             if self._cap and self._cap.isOpened():
                 return True
-            import cv2, sys
-            # On Windows, DirectShow (CAP_DSHOW) is more stable than
-            # the default MSMF backend which causes "can't grab frame" errors
+            
+            # Import cv2 here to avoid crashes if opencv is missing
+            try:
+                import cv2
+            except ImportError:
+                logger.error("OpenCV not installed.")
+                return False
+
+            # OS-specific backend selection
             if sys.platform == "win32":
                 cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
             else:
                 cap = cv2.VideoCapture(index)
+            
             if not cap.isOpened():
-                logger.error("Failed to open camera index %d", index)
+                logger.error("Failed to open camera index %d. Is it connected?", index)
                 return False
+            
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             self._cap = cap
             self._running = True
             self._thread = threading.Thread(target=self._capture_loop, daemon=True)
             self._thread.start()
+            logger.info("Camera %d opened successfully.", index)
             return True
 
     def _capture_loop(self):
         import cv2
         while True:
-            # Check running flag inside lock, then release before blocking read()
             with self._lock:
                 if not self._running or self._cap is None:
                     break
                 cap = self._cap
-            ret, frame = cap.read()          # blocking — must be outside the lock
+            
+            ret, frame = cap.read()
             if ret:
                 with self._lock:
                     self._latest_frame = cv2.flip(frame, 1)
-            time.sleep(0.01)                 # small yield — also outside the lock
+            time.sleep(0.01)
 
     def read(self):
         with self._lock:
@@ -140,6 +170,7 @@ class CameraManager:
                     pass
                 self._cap = None
             self._latest_frame = None
+            logger.info("Camera closed.")
 
     def is_open(self) -> bool:
         with self._lock:
@@ -148,14 +179,13 @@ class CameraManager:
 
 camera_mgr = CameraManager()
 
-
 @app.teardown_appcontext
 def _close_camera(_exc):
-    pass  # Camera is released by /api/camera/close or process exit
-
+    pass  # Camera is released manually via API or exit
 
 import atexit
 atexit.register(camera_mgr.close)
+
 
 # ─── MEDIAPIPE HAND DETECTOR ─────────────────────────────────────────────────
 
@@ -174,7 +204,6 @@ def _get_mp_hands():
                     static_image_mode=True,   # HTTP frames are not a continuous stream
                     max_num_hands=1,
                     min_detection_confidence=0.6,
-                    # min_tracking_confidence is ignored when static_image_mode=True
                 )
                 _mp_drawing = mp.solutions.drawing_utils
                 logger.info("MediaPipe Hands initialized.")
@@ -428,7 +457,7 @@ def api_camera_open():
     ok = camera_mgr.open(index)
     if ok:
         return _ok({"message": "Camera opened"})
-    return _err("Could not open camera.", 500)
+    return _err("Could not open camera. Ensure server has webcam access.", 500)
 
 
 @app.route("/api/camera/close", methods=["POST"])
@@ -441,6 +470,7 @@ def api_camera_close():
 @app.route("/video_feed")
 @login_required
 def video_feed():
+    """Streams MJPEG video from the server camera."""
     def generate():
         import cv2
         while True:
@@ -450,28 +480,18 @@ def video_feed():
                 continue
 
             try:
-                import cv2 as cv2_
-                frame_rgb = cv2_.cvtColor(frame, cv2_.COLOR_BGR2RGB)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 bbox, mp_results = detect_hand(frame_rgb)
 
                 if mp_results:
                     frame = draw_landmarks(frame, mp_results)
-                    # Green border when hand detected
-                    cv2_.rectangle(frame, (0, 0), (frame.shape[1] - 1, frame.shape[0] - 1),
+                    cv2.rectangle(frame, (0, 0), (frame.shape[1] - 1, frame.shape[0] - 1),
                                   (0, 255, 0), 3)
                 else:
-                    cv2_.rectangle(frame, (0, 0), (frame.shape[1] - 1, frame.shape[0] - 1),
+                    cv2.rectangle(frame, (0, 0), (frame.shape[1] - 1, frame.shape[0] - 1),
                                   (0, 0, 255), 3)
 
-                t_encode = time.perf_counter()
-                ret, buf = cv2_.imencode(".jpg", frame, [cv2_.IMWRITE_JPEG_QUALITY, 80])
-                elapsed = (time.perf_counter() - t_encode) * 1000
-
-                # Adaptive quality
-                quality = 60 if elapsed > 40 else 80
-                if quality != 80:
-                    _, buf = cv2_.imencode(".jpg", frame, [cv2_.IMWRITE_JPEG_QUALITY, quality])
-
+                ret, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if not ret:
                     continue
 
@@ -484,7 +504,6 @@ def video_feed():
             except Exception as exc:
                 logger.warning("video_feed frame error: %s", exc)
                 break
-
             time.sleep(1.0 / cfg.FRAME_RATE)
 
     return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame")
@@ -496,13 +515,14 @@ def video_feed():
 @login_required
 @limiter.limit("120 per minute")
 def api_predict():
+    """Handles prediction from uploaded file or base64 data."""
     session_id = _ensure_recognition_session()
     user_id = session["user_id"]
     user = db_manager.get_user_by_id(user_id)
     threshold = float(user.get("confidence_threshold", cfg.CONFIDENCE_THRESHOLD)) * 100
 
     try:
-        # Handle file upload
+        # 1. Get Image
         if "file" in request.files:
             f = request.files["file"]
             raw = f.read()
@@ -521,12 +541,12 @@ def api_predict():
             except ValueError as exc:
                 return _err(str(exc))
 
+        # 2. Detect Hand
         import cv2
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         bbox, mp_results = detect_hand(frame_rgb)
 
         if bbox is None:
-            # No hand detected
             buf = _get_buffer(session_id)
             buf.reset()
             return _ok({
@@ -537,25 +557,27 @@ def api_predict():
                 "buffer_votes": {},
             })
 
+        # 3. Predict
         preprocessed = preprocess_crop(frame, bbox, padding=20)
         result = cnn_model.cnn_predict(preprocessed, mp_results=mp_results)
 
-        # Temporal smoothing
+        # 4. Smooth predictions
         buf = _get_buffer(session_id)
         buf.add(result["letter"], result["confidence"])
         stability = buf.get_stable()
 
-        # Save to DB only if stable and above threshold
+        # 5. Save to DB
+        data = request.get_json(silent=True) or {}
         auto_save = data.get("auto_save", True) if not ("file" in request.files) else True
+        
         if stability["stable"] and result["confidence"] >= threshold and auto_save:
-            import json as _json
             db_manager.save_prediction(
                 user_id=user_id,
                 session_id=session_id,
                 letter=result["letter"],
                 confidence=result["confidence"],
-                top5_json=_json.dumps(result["top5"]),
-                letter_scores_json=_json.dumps(result["letter_scores"]),
+                top5_json=json.dumps(result["top5"]),
+                letter_scores_json=json.dumps(result["letter_scores"]),
             )
 
         return _ok({
@@ -581,11 +603,7 @@ def api_predict():
 @login_required
 @limiter.limit("200 per minute")
 def api_predict_frame():
-    """
-    Server-side prediction: reads the latest frame directly from the server
-    camera (OpenCV). No image upload needed from the browser.
-    Works over plain HTTP — no HTTPS / getUserMedia required.
-    """
+    """Handles prediction from the server's active camera stream."""
     session_id = _ensure_recognition_session()
     user_id = session["user_id"]
     user = db_manager.get_user_by_id(user_id)
@@ -628,14 +646,13 @@ def api_predict_frame():
         stability = buf.get_stable()
 
         if stability["stable"] and result["confidence"] >= threshold and auto_save:
-            import json as _json
             db_manager.save_prediction(
                 user_id=user_id,
                 session_id=session_id,
                 letter=result["letter"],
                 confidence=result["confidence"],
-                top5_json=_json.dumps(result["top5"]),
-                letter_scores_json=_json.dumps(result["letter_scores"]),
+                top5_json=json.dumps(result["top5"]),
+                letter_scores_json=json.dumps(result["letter_scores"]),
             )
 
         return _ok({
@@ -670,7 +687,6 @@ def api_session_reset():
 # ─── WORD / SENTENCE BUILDER API ─────────────────────────────────────────────
 
 def _get_word_session():
-    """Get or create a word-building session for the current user, cached in Flask session."""
     user_id = session["user_id"]
     ws = db_manager.get_or_create_word_session(user_id)
     return ws
@@ -731,6 +747,7 @@ def api_word_history():
 
 
 # ─── TTS API ──────────────────────────────────────────────────────────────────
+# Note: pyttsx3 fallback removed for server stability (Render/Heroku compatibility).
 
 @app.route("/api/tts/speak", methods=["POST"])
 @login_required
@@ -751,7 +768,7 @@ def api_tts_speak():
 
 
 def _generate_tts(text: str) -> str:
-    """Generate TTS audio and return as Base64 MP3 string."""
+    """Generate TTS audio and return as Base64 MP3 string using gTTS."""
     try:
         from gtts import gTTS
         buf = io.BytesIO()
@@ -760,23 +777,8 @@ def _generate_tts(text: str) -> str:
         buf.seek(0)
         return base64.b64encode(buf.read()).decode()
     except Exception as exc:
-        logger.warning("gTTS failed (%s), trying pyttsx3 fallback.", exc)
-
-    # pyttsx3 fallback — saves to temp file then reads
-    try:
-        import pyttsx3
-        import tempfile
-        engine = pyttsx3.init()
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            path = tmp.name
-        engine.save_to_file(text, path)
-        engine.runAndWait()
-        with open(path, "rb") as f:
-            data = f.read()
-        os.unlink(path)
-        return base64.b64encode(data).decode()
-    except Exception as exc2:
-        raise RuntimeError(f"Both TTS engines failed: {exc2}") from exc2
+        logger.warning("gTTS failed: %s", exc)
+        raise RuntimeError(f"TTS generation failed: {exc}") from exc
 
 
 # ─── USER / STATS API ─────────────────────────────────────────────────────────
@@ -793,8 +795,8 @@ def api_user_me():
         "email": user["email"],
         "is_admin": bool(user.get("is_admin")),
         "confidence_threshold": user.get("confidence_threshold", 0.70),
-        "created_at": user["created_at"].isoformat() if user.get("created_at") else None,
-        "last_login": user["last_login"].isoformat() if user.get("last_login") else None,
+        "created_at": user.get("created_at").isoformat() if user.get("created_at") else None,
+        "last_login": user.get("last_login").isoformat() if user.get("last_login") else None,
     })
 
 
@@ -916,7 +918,6 @@ def api_delete_account():
 
 @app.route("/api/model_info", methods=["GET"])
 def api_model_info():
-    """Public endpoint — returns the current model type (no auth needed)."""
     return jsonify({
         "model_type": cnn_model.get_model_type(),
         "demo_mode":  cnn_model.is_demo_mode(),
@@ -940,12 +941,9 @@ def api_admin_model_stats():
 @app.route("/api/admin/upload_model", methods=["POST"])
 @login_required
 def api_upload_model():
-    """
-    Upload a trained Keras model (.h5 or .keras) to replace the current model.
-    The model type (landmark_dnn / pixel_cnn) is auto-detected from input shape.
-    """
     import shutil
     import tempfile
+    
     if "model" not in request.files:
         return _err("No model file provided. Include it as 'model' in the form-data.")
 
@@ -971,7 +969,6 @@ def api_upload_model():
         if len(in_shape) == 2 and in_shape[-1] == 63:
             detected_type = 'landmark_dnn'
         elif len(in_shape) == 4 and in_shape[3] == 3:
-            # Any H×W×3 image CNN (50×50, 64×64, 96×96, …)
             detected_type = 'pixel_cnn'
         else:
             os.unlink(tmp_path)
@@ -1013,11 +1010,7 @@ def api_upload_model():
 @app.route("/api/admin/start_training", methods=["POST"])
 @login_required
 def api_start_training():
-    """
-    Launch fast_train.py as an independent subprocess.
-    Returns immediately; poll /api/admin/training_status for progress.
-    """
-    import subprocess, sys as _sys
+    import subprocess
     status_path = os.path.join(os.path.dirname(__file__), "models", "training_status.json")
     script_path = os.path.join(os.path.dirname(__file__), "fast_train.py")
 
@@ -1035,8 +1028,8 @@ def api_start_training():
 
     try:
         proc = subprocess.Popen(
-            [_sys.executable, script_path],
-            stdout=open(os.path.join(os.path.dirname(__file__),
+            [sys.executable, script_path],
+            stdout=open(os.path.join(os.path.dirname(__file__), 
                         "models", "train_stdout.log"), "w"),
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -1057,7 +1050,6 @@ def api_start_training():
 @app.route("/api/admin/training_status", methods=["GET"])
 @login_required
 def api_training_status():
-    """Return the current training status from the JSON status file."""
     status_path = os.path.join(os.path.dirname(__file__), "models", "training_status.json")
     if not os.path.isfile(status_path):
         return _ok({"phase": "idle", "message": "No training started yet.",
@@ -1122,20 +1114,17 @@ def api_leaderboard():
     period   = request.args.get("period", "all")
     user_id  = session["user_id"]
 
-    # Try to get real data from DB; fall back to demo
     try:
         my_stats = db_manager.get_user_stats(user_id, date_range="all") or {}
         my_total = my_stats.get("total_predictions", 0)
         my_freq  = my_stats.get("letter_frequency", {})
         my_unique = len(my_freq)
 
-        # Build demo leaderboard with the current user + synthetic rivals
         import random
         random.seed(42)
         NAMES = ["Alex M.","Jordan K.","Sam R.","Taylor B.","Casey N.","Riley P.","Quinn A.","Morgan L.","Avery T.","Charlie S."]
         base_counts = [random.randint(50, 3000) for _ in NAMES]
 
-        # Insert current user at a realistic rank
         all_entries = [
             {
                 "name": n,
@@ -1173,9 +1162,9 @@ def api_achievements():
     unique  = len(freq)
     best_c  = stats.get("personal_best", {}).get("confidence", 0) if stats.get("personal_best") else 0
     days    = stats.get("daily_counts", [])
-    streak  = 0
+    
+    streak = 0
     if days:
-        from datetime import date, timedelta
         today = date.today()
         for i in range(len(days)):
             d = today - timedelta(days=i)
@@ -1185,96 +1174,15 @@ def api_achievements():
                 break
 
     badges = [
-        {
-            "id":      "first_sign",
-            "title":   "First Sign",
-            "desc":    "Make your very first prediction",
-            "icon":    "hand",
-            "color":   "#6c63ff",
-            "earned":  total >= 1,
-            "progress": min(1, total),
-            "goal":    1,
-        },
-        {
-            "id":      "century",
-            "title":   "Century",
-            "desc":    "Reach 100 total predictions",
-            "icon":    "star",
-            "color":   "#f59e0b",
-            "earned":  total >= 100,
-            "progress": min(100, total),
-            "goal":    100,
-        },
-        {
-            "id":      "millennium",
-            "title":   "Millennium",
-            "desc":    "Reach 1,000 total predictions",
-            "icon":    "zap",
-            "color":   "#ef4444",
-            "earned":  total >= 1000,
-            "progress": min(1000, total),
-            "goal":    1000,
-        },
-        {
-            "id":      "explorer",
-            "title":   "Explorer",
-            "desc":    "Sign at least 10 different letters",
-            "icon":    "compass",
-            "color":   "#10b981",
-            "earned":  unique >= 10,
-            "progress": min(10, unique),
-            "goal":    10,
-        },
-        {
-            "id":      "alphabet",
-            "title":   "Alphabet Master",
-            "desc":    "Sign all 26 letters of the alphabet",
-            "icon":    "trophy",
-            "color":   "#f59e0b",
-            "earned":  unique >= 26,
-            "progress": min(26, unique),
-            "goal":    26,
-        },
-        {
-            "id":      "precision",
-            "title":   "Precision",
-            "desc":    "Achieve 90%+ confidence on any letter",
-            "icon":    "target",
-            "color":   "#06b6d4",
-            "earned":  best_c >= 90,
-            "progress": min(90, round(best_c)),
-            "goal":    90,
-        },
-        {
-            "id":      "perfectionist",
-            "title":   "Perfectionist",
-            "desc":    "Achieve 99%+ confidence on any letter",
-            "icon":    "award",
-            "color":   "#8b5cf6",
-            "earned":  best_c >= 99,
-            "progress": min(99, round(best_c)),
-            "goal":    99,
-        },
-        {
-            "id":      "streak3",
-            "title":   "On Fire",
-            "desc":    "Practice 3 days in a row",
-            "icon":    "flame",
-            "color":   "#f97316",
-            "earned":  streak >= 3,
-            "progress": min(3, streak),
-            "goal":    3,
-        },
-        {
-            "id":      "streak7",
-            "title":   "Week Warrior",
-            "desc":    "Practice 7 days in a row",
-            "icon":    "calendar",
-            "color":   "#ec4899",
-            "earned":  streak >= 7,
-            "progress": min(7, streak),
-            "goal":    7,
-        },
+        {"id": "first_sign", "title": "First Sign", "desc": "Make your very first prediction", "icon": "hand", "color": "#6c63ff", "earned": total >= 1, "progress": min(1, total), "goal": 1},
+        {"id": "century", "title": "Century", "desc": "Reach 100 total predictions", "icon": "star", "color": "#f59e0b", "earned": total >= 100, "progress": min(100, total), "goal": 100},
+        {"id": "millennium", "title": "Millennium", "desc": "Reach 1,000 total predictions", "icon": "zap", "color": "#ef4444", "earned": total >= 1000, "progress": min(1000, total), "goal": 1000},
+        {"id": "explorer", "title": "Explorer", "desc": "Sign at least 10 different letters", "icon": "compass", "color": "#10b981", "earned": unique >= 10, "progress": min(10, unique), "goal": 10},
+        {"id": "alphabet", "title": "Alphabet Master", "desc": "Sign all 26 letters of the alphabet", "icon": "trophy", "color": "#f59e0b", "earned": unique >= 26, "progress": min(26, unique), "goal": 26},
+        {"id": "precision", "title": "Precision", "desc": "Achieve 90%+ confidence on any letter", "icon": "target", "color": "#06b6d4", "earned": best_c >= 90, "progress": min(90, round(best_c)), "goal": 90},
+        {"id": "perfectionist", "title": "Perfectionist", "desc": "Achieve 99%+ confidence on any letter", "icon": "award", "color": "#8b5cf6", "earned": best_c >= 99, "progress": min(99, round(best_c)), "goal": 99},
+        {"id": "streak3", "title": "On Fire", "desc": "Practice 3 days in a row", "icon": "flame", "color": "#f97316", "earned": streak >= 3, "progress": min(3, streak), "goal": 3},
+        {"id": "streak7", "title": "Week Warrior", "desc": "Practice 7 days in a row", "icon": "calendar", "color": "#ec4899", "earned": streak >= 7, "progress": min(7, streak), "goal": 7},
     ]
     earned_count = sum(1 for b in badges if b["earned"])
     return _ok({"badges": badges, "streak": streak, "earned": earned_count, "total_badges": len(badges)})
@@ -1333,13 +1241,14 @@ def internal_error(_e):
     return render_template("index.html", error="Internal server error.", user=_current_user()), 500
 
 
+# ─── MAIN ENTRY POINT ─────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
+    # Only for local development. Render uses Gunicorn.
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV", "development") == "development"
 
-    # Disable the watchdog/stat reloader to prevent SystemExit errors when
-    # running inside IDEs (Spyder, PyCharm, Jupyter) on Windows and Linux.
-    # Set FLASK_USE_RELOADER=true in your environment to enable hot-reload.
+    # Disable watchdog reloader for stability in IDEs
     use_reloader = os.environ.get("FLASK_USE_RELOADER", "false").lower() == "true"
 
     app.run(
