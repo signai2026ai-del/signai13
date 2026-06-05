@@ -35,4 +35,4 @@ pywin32==306 ; sys_platform == "win32"
 
 # ── Production Server ──────────────────────────────────────
 # gunicorn does NOT work on Windows — remove the # only on Linux/Mac
-# gunicorn==21.2.0
+gunicorn==21.2.0
